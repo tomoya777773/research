@@ -193,7 +193,7 @@ if __name__=='__main__':
     print('false accurency:', false_count/n)
 
 
-    plt.scatter(true_x, true_y, marker="X", color='r', alpha=0.8, label = "correct",s=70)
+    plt.scatter(true_x, true_y, marker="x", color='r', alpha=0.8, label = "correct",s=70)
     plt.scatter(false_x, false_y, marker="v", color='b', alpha=0.8, label = "incorrect",s=70)
     plt.scatter(x_s, y_s, marker='o', color='black',label="sample",s=30)
 
