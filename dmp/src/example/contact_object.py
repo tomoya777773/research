@@ -1,19 +1,3 @@
-'''
-Copyright (C) 2016 Travis DeWolf
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
-'''
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,8 +8,14 @@ beta = 20.0 / np.pi
 gamma = 100
 R_halfpi = np.array([[np.cos(np.pi / 2.0), -np.sin(np.pi / 2.0)],
                      [np.sin(np.pi / 2.0), np.cos(np.pi / 2.0)]])
-num_obstacles = 5
-obstacles = np.random.random((num_obstacles, 2))*2 - 1
+
+num_obstacles = 100
+x_ = np.linspace(0, 8, num_obstacles)
+y_ = np.sin(x_)
+obstacles = np.column_stack([x_,y_])
+
+
+
 # print obstacles
 def avoid_obstacles(y, dy, goal):
     p = np.zeros(2)
@@ -49,7 +39,8 @@ def avoid_obstacles(y, dy, goal):
             # print phi, phi_dy
             dphi = gamma * phi * np.exp(-beta * abs(phi))
             R = np.dot(R_halfpi, np.outer(obstacle - y, dy))
-            pval = np.nan_to_num(np.dot(R, dy) * dphi)
+
+            pval = -np.nan_to_num(np.dot(R, dy) * dphi)
 
             # check to see if the distance to the obstacle is further than
             # the distance to the target, if it is, ignore the obstacle
@@ -59,32 +50,29 @@ def avoid_obstacles(y, dy, goal):
             p += pval
     return p
 
+
 # test normal run
-dmp = pydmps.dmp_discrete.DMPs_discrete(n_dmps=2, n_bfs=10,
-                                        w=np.zeros((2,10)))
+dmp = pydmps.dmp_discrete.DMPs_discrete(n_dmps=2, n_bfs=100,w=np.zeros((2,100)))
 y_track = np.zeros((dmp.timesteps, dmp.n_dmps))
 dy_track = np.zeros((dmp.timesteps, dmp.n_dmps))
 ddy_track = np.zeros((dmp.timesteps, dmp.n_dmps))
-goals = [[np.cos(theta), np.sin(theta)] for theta in np.linspace(0, 2*np.pi, 20)[:-1]]
+goal = np.array([1,1])
+dmp.goal = goal
+# dmp.y0 = np.array([1,1])
+dmp.reset_state()
 
-for goal in goals:
-    dmp.goal = goal
-    # print dmp.y
-    dmp.reset_state()
-    # print dmp.y
-    for t in range(dmp.timesteps):
-        print dmp.y
-        y_track[t], dy_track[t], ddy_track[t] = \
-                dmp.step(external_force=avoid_obstacles(dmp.y, dmp.dy, goal))
+for t in range(dmp.timesteps):
+    y_track[t], dy_track[t], ddy_track[t] = \
+            dmp.step(external_force=avoid_obstacles(dmp.y, dmp.dy, goal))
 
-    plt.figure(1, figsize=(6,6))
-    plot_goal, = plt.plot(dmp.goal[0], dmp.goal[1], 'gx', mew=3)
-    for obstacle in obstacles:
-        plot_obs, = plt.plot(obstacle[0], obstacle[1], 'rx', mew=3)
-    plot_path, = plt.plot(y_track[:,0], y_track[:, 1], 'b', lw=2)
-    plt.title('DMP system - obstacle avoidance')
-
+plt.figure(1, figsize=(6,6))
+plot_goal, = plt.plot(dmp.goal[0], dmp.goal[1], 'gx', mew=3)
+for obstacle in obstacles:
+    plot_obs, = plt.plot(obstacle[0], obstacle[1], 'rx', mew=3)
+plot_path, = plt.plot(y_track[:,0], y_track[:, 1], 'b', lw=2)
+plt.title('DMP system - obstacle avoidance')
 plt.axis('equal')
-plt.xlim([-1.1,1.1])
+plt.xlim([-1.1,3])
 plt.ylim([-1.1,1.1])
 plt.show()
+
