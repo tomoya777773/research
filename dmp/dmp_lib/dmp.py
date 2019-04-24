@@ -90,9 +90,10 @@ class DMPs(object):
 
         # calculate velocity of y_des
         dy_des = np.diff(y_des) / self.dt # shape 99
+        self.dyyy = dy_des
+
         # add zero to the beginning of every row
         dy_des = np.hstack((np.zeros((self.dmps, 1)), dy_des)) # shape 100
-
         # calculate acceleration of y_des
         ddy_des = np.diff(dy_des) / self.dt
         # add zero to the beginning of every row

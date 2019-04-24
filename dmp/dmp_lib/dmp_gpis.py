@@ -87,35 +87,7 @@ class DmpsGpis(DMPs):
                 denom = np.sum(x_track**2 * psi_track[:,b])
                 self.w[d,b] = numer / (k * denom)
 
-    def rollout(self, direction=[0,0],timesteps=None, external_force=None, **kwargs):
-        """Generate a system trial, no feedback is incorporated."""
-        # print external_force
-        self.reset_state()
-        # print external_force
-        if timesteps is None:
-            if kwargs.has_key('tau'):
-                timesteps = int(self.timesteps / kwargs['tau'])
-            else:
-                timesteps = self.timesteps
-        # print external_force
-        # set up tracking vectors
-        y_track = np.zeros((timesteps, self.dmps))
-        dy_track = np.zeros((timesteps, self.dmps))
-        ddy_track = np.zeros((timesteps, self.dmps))
-
-        for t in range(timesteps):
-
-            y, dy, ddy = self.step(direction, external_force=external_force, **kwargs)
-
-            # record timestep
-            y_track[t] = y
-            dy_track[t] = dy
-            ddy_track[t] = ddy
-
-        return y_track, dy_track, ddy_track
-
-
-    def step(self, direction, tau=1.0, state_fb=None, external_force=None):
+    def step(self, tau=1.0, state_fb=None, external_force=None):
         """Run the DMP system for a single timestep.
 
        tau float: scales the timestep
@@ -142,44 +114,10 @@ class DmpsGpis(DMPs):
             f = self.gen_front_term(x, d) * (np.dot(psi, self.w[d])) / np.sum(psi)
 
             # DMP acceleration
-            # print direction
-
-            self.ddy[d] = (self.ay[d] * (self.by[d] * (self.goal[d] - self.y[d]) - self.dy[d]/tau) + f + direction[d]) * tau**2
+            self.ddy[d] = (self.ay[d] * (self.by[d] * (self.goal[d] - self.y[d]) - self.dy[d]/tau) + f) * tau**2
             if external_force is not None:
                 self.ddy[d] += external_force[d]
             self.dy[d] += self.ddy[d] * self.dt * cs_args['error_coupling']
             self.y[d] += self.dy[d] * self.dt * cs_args['error_coupling']
 
         return self.y, self.dy, self.ddy
-
-    def avoid_obstacles(self, y, dy, goal):
-        p = np.zeros(2)
-
-        for obstacle in obstacles:
-            # based on (Hoffmann, 2009)
-
-            # if we're moving
-            if np.linalg.norm(dy) > 1e-5:
-
-                # get the angle we're heading in
-                phi_dy = -np.arctan2(dy[1], dy[0])
-                R_dy = np.array([[np.cos(phi_dy), -np.sin(phi_dy)],
-                                [np.sin(phi_dy), np.cos(phi_dy)]])
-                # calculate vector to object relative to body
-                obj_vec = obstacle - y
-                # rotate it by the direction we're going
-                obj_vec = np.dot(R_dy, obj_vec)
-                # calculate the angle of obj relative to the direction we're going
-                phi = np.arctan2(obj_vec[1], obj_vec[0])
-                # print phi, phi_dy
-                dphi = gamma * phi * np.exp(-beta * abs(phi))
-                R = np.dot(R_halfpi, np.outer(obstacle - y, dy))
-                pval = -np.nan_to_num(np.dot(R, dy) * dphi)
-
-                # check to see if the distance to the obstacle is further than
-                # the distance to the target, if it is, ignore the obstacle
-                if np.linalg.norm(obj_vec) > np.linalg.norm(goal - y):
-                    pval = 0
-
-                p += pval
-        return p

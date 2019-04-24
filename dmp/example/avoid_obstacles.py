@@ -49,7 +49,7 @@ def avoid_obstacles(y, dy, goal):
             # print phi, phi_dy
             dphi = gamma * phi * np.exp(-beta * abs(phi))
             R = np.dot(R_halfpi, np.outer(obstacle - y, dy))
-            pval = np.nan_to_num(np.dot(R, dy) * dphi)
+            pval = -np.nan_to_num(np.dot(R, dy) * dphi)
 
             # check to see if the distance to the obstacle is further than
             # the distance to the target, if it is, ignore the obstacle
