@@ -184,4 +184,4 @@ class GaussianProcessImplicitSurface:
         S = np.dot(projection_n, diff_var)
         direction = self.a * S / np.linalg.norm(S, ord=2)
 
-        return normal, direction
+        return normal.T[0], direction

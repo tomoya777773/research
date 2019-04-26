@@ -5,22 +5,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dmp_lib import DmpsGpis
 from gpis import GaussianProcessImplicitSurface
-
+import math
 
 beta = 2
-gamma = 100
+gamma = 200
 R_halfpi = np.array([[np.cos(np.pi / 2.0), -np.sin(np.pi / 2.0)],
                      [np.sin(np.pi / 2.0), np.cos(np.pi / 2.0)]])
 
-num_obstacles = 100
-x_ = np.linspace(0, 8, num_obstacles)
-y_ = np.sin(x_)
-obstacles = np.column_stack([x_,y_])
-# print obstacles
-
 
 def contact_judge(current_position):
-    return round(current_position[1] - np.sin(current_position[0]), 2) == 0
+    return round(current_position[1] - np.sin(current_position[0]), 1) == 0
 
 def prevent_insert(judge_position):
     return judge_position[1] > np.sin(judge_position[0])
@@ -65,16 +59,39 @@ def avoid_obstacles(dy, direction, goal):
 if __name__ == '__main__':
 
     # Create GPIS model
-    x = np.arange(1, 8, 0.1)
-    y = np.sin(x)
-    position_data = np.column_stack([x,y])
-    label_data = np.zeros(len(x)).reshape(-1, 1)
+    x_ = np.arange(0, 8, 0.1)
+    y_ = np.sin(x_)
+    position_data = np.column_stack([x_,y_])
+    label_data = np.zeros(len(x_)).reshape(-1, 1)
     gpis = GaussianProcessImplicitSurface(position_data, label_data, a=1)
 
     # Create DMP model
     path_x = np.linspace(3, 6, 100)
     # path_y = 0.1 * np.sin(path_x) + 0.8183676841431136
-    path_y = 0.1 * np.sin(path_x) + 0.2
+    # path_y = 0.1*np.sin(path_x) + 0.18
+    path_y = np.full(len(path_x), 0.3)
+
+    # x1 = np.arange(3, 4.6, 0.1)
+    # y1 = np.full(len(x1), 0.4)
+
+    # x2, y2 =[],[]
+
+    # for _x in np.linspace(180,-180,60):
+    #     x2.append(0.5*math.sin(math.radians(_x))+4.5)
+    #     y2.append(0.5*math.cos(math.radians(_x))+0.9)
+
+    # x3 = np.arange(4.5, 6, 0.1)
+    # y3 = np.full(len(x3), 0.4)
+
+    # path_x = np.append(x1,x3)
+    # path_y = np.append(y1, y3)
+
+
+    # for i in range(len(path_x)):
+    #     plt.scatter(path_x[i], path_y[i])
+    #     plt.pause(0.02)
+
+
 
     dmp = DmpsGpis(dmps=2, bfs=100)
     dmp.imitate_path(y_des=np.array([path_x, path_y]))
@@ -85,57 +102,57 @@ if __name__ == '__main__':
     dy = [0, 0]
     y_track = []
     cnt = 1
-    for i in range(dmp.timesteps):
+
+    while round(current_position[0] - dmp.goal[0], 1) != 0:
+        if cnt > 3000: break
+
         print "-----------------------------------"
         print "count:", cnt
         print "position:",current_position
         print "dy:", dy
         n,d = gpis.direction_func(current_position)
-
+        print "-------------------", contact_judge(current_position)
+        print "nnnnnnnnnnnnnnnn", n
         if contact_judge(current_position):
-            direction = d
-            print "dddddddddddd:", d
-            # print "nnnnnnnnnnnn:", -n.T[0]
+            direction = n
+            print "nnnnnnnnn:", n
 
         else:
-            direction = -n.T[0]
-            print "nnnnnnnnnnnn:", -n.T[0]
+            direction = -n
+            # print "normal:", -n
 
         external_force=avoid_obstacles(dy, direction, dmp.goal)
-        print "eeeeeeeeeeeeeeeeeeeeeee", external_force
+        print "external_force:", external_force
+
         y, dy, ddy = dmp.step(external_force=external_force)
 
         judge = True
         interval = 100
         dt = (y - current_position) / interval
         n = 0
-        while n < interval:
-            judge = prevent_insert(current_position)
-            # print judge
-            if not judge:
-                # current_position -= dt
-                break
-            current_position += dt
 
-            n += 1
+        if prevent_insert(current_position):
 
-        y = current_position
-        dmp.y = current_position
-        y_track.append(np.copy(y))
+            while n < interval:
+                judge = prevent_insert(current_position)
+                # print judge
+                if not judge:
+                    current_position -= dt
+                    break
+                current_position += dt
 
+                n += 1
+        # plt.scatter(current_position[0], current_position[1])
+        # plt.pause(0.001)
+
+        # dmp.y = current_position
+        y_track.append(np.copy(current_position))
+        # print "goal:", dmp.goal
         cnt += 1
-
 
     y_track = np.array(y_track)
 
-
-
-
-    # print y_track[:, 0]
-    # print path
-    # print path[-1]
     plt.plot(y_track[:, 0], y_track[:, 1], lw = 2)
-    # plt.plot(x, y, lw = 2)
     plt.plot(path_x, path_y)
     plt.plot(x_, y_, c ="r")
     plt.xlim(0, 8)
