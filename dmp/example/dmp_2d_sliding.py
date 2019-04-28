@@ -8,7 +8,7 @@ from gpis import GaussianProcessImplicitSurface
 import math
 
 beta = 2
-gamma = 200
+gamma = 300
 R_halfpi = np.array([[np.cos(np.pi / 2.0), -np.sin(np.pi / 2.0)],
                      [np.sin(np.pi / 2.0), np.cos(np.pi / 2.0)]])
 
@@ -49,42 +49,43 @@ def avoid_obstacles(dy, direction, goal):
         #     R_half = -R_halfpi
         R = np.dot(R_halfpi, np.outer(direction, dy))
 
+        p = np.nan_to_num(np.dot(R_halfpi, dy) * dphi)
 
-        pval = np.nan_to_num(np.dot(R_halfpi, dy) * dphi)
-
-        p += pval
-    # print "pppp", p
     return p
 
 if __name__ == '__main__':
 
     # Create GPIS model
-    x_ = np.arange(0, 8, 0.1)
-    y_ = np.sin(x_)
+    x_ = np.arange(1, 12, 0.1)
+    y_ = np.sin(x_) - 0.02
     position_data = np.column_stack([x_,y_])
     label_data = np.zeros(len(x_)).reshape(-1, 1)
     gpis = GaussianProcessImplicitSurface(position_data, label_data, a=1)
 
     # Create DMP model
-    path_x = np.linspace(3, 6, 100)
+    path_x = np.linspace(2, 10, 100)
     # path_y = 0.1 * np.sin(path_x) + 0.8183676841431136
-    # path_y = 0.1*np.sin(path_x) + 0.18
-    path_y = np.full(len(path_x), 0.3)
+    path_y = 0.1*np.sin(path_x) + 1.0
+    # path_y = np.full(len(path_x), 1.2)
 
-    # x1 = np.arange(3, 4.6, 0.1)
+    # x1 = np.arange(3, 5, 0.1)
     # y1 = np.full(len(x1), 0.4)
 
-    # x2, y2 =[],[]
+    # x2 = np.arange(5, 4, 0.1)
+    # y2 = np.full(len(x2), 0.4)
 
-    # for _x in np.linspace(180,-180,60):
-    #     x2.append(0.5*math.sin(math.radians(_x))+4.5)
-    #     y2.append(0.5*math.cos(math.radians(_x))+0.9)
 
-    # x3 = np.arange(4.5, 6, 0.1)
+    # # x2, y2 =[],[]
+
+    # # for _x in np.linspace(180,-180,60):
+    # #     x2.append(0.5*math.sin(math.radians(_x))+4.5)
+    # #     y2.append(0.5*math.cos(math.radians(_x))+0.9)
+
+    # x3 = np.arange(4, 6, 0.1)
     # y3 = np.full(len(x3), 0.4)
 
-    # path_x = np.append(x1,x3)
-    # path_y = np.append(y1, y3)
+    # path_x = np.append(np.append(x1,x2), x3)
+    # path_y = np.append(np.append(y1, y2), y3)
 
 
     # for i in range(len(path_x)):
@@ -103,19 +104,22 @@ if __name__ == '__main__':
     y_track = []
     cnt = 1
 
-    while round(current_position[0] - dmp.goal[0], 1) != 0:
-        if cnt > 3000: break
+    while abs(current_position[0] - dmp.goal[0]) > 0.2:
+        if cnt > 1000: break
 
         print "-----------------------------------"
         print "count:", cnt
         print "position:",current_position
         print "dy:", dy
-        n,d = gpis.direction_func(current_position)
         print "-------------------", contact_judge(current_position)
+        print "goal:", dmp.goal
+
+        n,d = gpis.direction_func(current_position)
         print "nnnnnnnnnnnnnnnn", n
+
         if contact_judge(current_position):
             direction = n
-            print "nnnnnnnnn:", n
+            # print "nnnnnnnnn:", n
 
         else:
             direction = -n
@@ -124,7 +128,8 @@ if __name__ == '__main__':
         external_force=avoid_obstacles(dy, direction, dmp.goal)
         print "external_force:", external_force
 
-        y, dy, ddy = dmp.step(external_force=external_force)
+        y, dy, ddy = dmp.step(external_force=external_force*5)
+        dy = dy/np.linalg.norm(dy)
 
         judge = True
         interval = 100
@@ -134,20 +139,18 @@ if __name__ == '__main__':
         if prevent_insert(current_position):
 
             while n < interval:
+                current_position += dt
                 judge = prevent_insert(current_position)
-                # print judge
                 if not judge:
                     current_position -= dt
                     break
-                current_position += dt
-
                 n += 1
+
         # plt.scatter(current_position[0], current_position[1])
         # plt.pause(0.001)
 
         # dmp.y = current_position
-        y_track.append(np.copy(current_position))
-        # print "goal:", dmp.goal
+            y_track.append(np.copy(current_position))
         cnt += 1
 
     y_track = np.array(y_track)
@@ -155,7 +158,7 @@ if __name__ == '__main__':
     plt.plot(y_track[:, 0], y_track[:, 1], lw = 2)
     plt.plot(path_x, path_y)
     plt.plot(x_, y_, c ="r")
-    plt.xlim(0, 8)
-    plt.ylim(-4, 4)
+    plt.xlim(0, 11)
+    plt.ylim(-3, 3)
     # plt.savefig("sliding1.png")
     plt.show()
