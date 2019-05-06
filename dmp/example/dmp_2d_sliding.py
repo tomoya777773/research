@@ -7,14 +7,14 @@ from dmp_lib import DmpsGpis
 from gpis import GaussianProcessImplicitSurface
 import math
 
-beta = 2
+beta = 1.5
 gamma = 300
 R_halfpi = np.array([[np.cos(np.pi / 2.0), -np.sin(np.pi / 2.0)],
                      [np.sin(np.pi / 2.0), np.cos(np.pi / 2.0)]])
 
 
 def contact_judge(current_position):
-    return round(current_position[1] - np.sin(current_position[0]), 1) == 0
+    return round(current_position[1] - np.sin(current_position[0]), 2) == 0
 
 def prevent_insert(judge_position):
     return judge_position[1] > np.sin(judge_position[0])
@@ -35,19 +35,12 @@ def avoid_obstacles(dy, direction, goal):
         R_phi = np.array([[np.cos(phi), -np.sin(phi)],
                           [np.sin(phi), np.cos(phi)]])
 
-
         dphi = gamma * phi * np.exp(-beta / abs(phi))
-        # print "phipppppppppppp", phi*180/np.pi
 
+        # print "phi:", phi*180/np.pi
         print "phi_dy:", phi_dy
         print "vec:", d_vec
         print "phi", phi
-
-        # if phi > 0:
-        #     R_half =  R_halfpi
-        # else:
-        #     R_half = -R_halfpi
-        R = np.dot(R_halfpi, np.outer(direction, dy))
 
         p = np.nan_to_num(np.dot(R_halfpi, dy) * dphi)
 
@@ -64,9 +57,92 @@ if __name__ == '__main__':
 
     # Create DMP model
     path_x = np.linspace(2, 10, 100)
+    path_y = np.full(len(path_x), 1.2)
+
     # path_y = 0.1 * np.sin(path_x) + 0.8183676841431136
-    path_y = 0.1*np.sin(path_x) + 1.0
-    # path_y = np.full(len(path_x), 1.2)
+    # path_y = 0.1*np.sin(path_x) + 1.0
+
+    # for i in range(len(path_x)):
+    #     plt.scatter(path_x[i], path_y[i])
+    #     plt.pause(0.02)
+
+    dmp = DmpsGpis(dmps=2, bfs=500, dt= 0.005)
+    dmp.imitate_path(y_des=np.array([path_x, path_y]))
+
+
+    """test"""
+    current_position = np.array([path_x[0], path_y[0]])
+    dy = np.array([0, 0])
+    y_track = []
+    cnt = 1
+
+    while abs(current_position[0] - dmp.goal[0]) > 0.2:
+        if cnt > 1000: break
+
+        print "-----------------------------------"
+        print "count:", cnt
+        print "position:",current_position
+        print "dy:", dy
+        print "-------------------", contact_judge(current_position)
+
+        n,d = gpis.direction_func(current_position)
+
+        if contact_judge(current_position):
+            direction = n
+            d_judge = True
+            # print "nnnnnnnnn:", n
+
+        else:
+            direction = -n
+            d_judge = False
+            # print "normal:", -n
+
+        external_force=avoid_obstacles(dy, direction, dmp.goal)
+        print "external_force:", external_force
+
+        y, dy, ddy = dmp.step(external_force=external_force*5)
+        dy = dy/np.linalg.norm(dy)
+
+        judge = True
+        interval = 100
+        dt = (y - current_position) / interval
+        n = 0
+
+
+        if prevent_insert(current_position):
+
+            while n < interval:
+                current_position += dt
+
+                # if d_judge:
+                #     if not contact_judge(current_position):
+                #         break
+
+                if not prevent_insert(current_position):
+                    current_position -= dt
+                    break
+                n += 1
+
+
+
+            y_track.append(np.copy(current_position))
+        cnt += 1
+
+        plt.scatter(current_position[0], current_position[1])
+        plt.pause(0.001)
+
+    y_track = np.array(y_track)
+
+    plt.plot(y_track[:, 0], y_track[:, 1], lw = 2)
+    plt.plot(path_x, path_y)
+    plt.plot(x_, y_, c ="r")
+    plt.xlim(0, 11)
+    plt.ylim(-3, 3)
+    # plt.savefig("sliding1.png")
+    plt.show()
+
+
+
 
     # x1 = np.arange(3, 5, 0.1)
     # y1 = np.full(len(x1), 0.4)
@@ -87,78 +163,3 @@ if __name__ == '__main__':
     # path_x = np.append(np.append(x1,x2), x3)
     # path_y = np.append(np.append(y1, y2), y3)
 
-
-    # for i in range(len(path_x)):
-    #     plt.scatter(path_x[i], path_y[i])
-    #     plt.pause(0.02)
-
-
-
-    dmp = DmpsGpis(dmps=2, bfs=100)
-    dmp.imitate_path(y_des=np.array([path_x, path_y]))
-
-
-    """test"""
-    current_position = np.array([path_x[0], path_y[0]])
-    dy = [0, 0]
-    y_track = []
-    cnt = 1
-
-    while abs(current_position[0] - dmp.goal[0]) > 0.2:
-        if cnt > 1000: break
-
-        print "-----------------------------------"
-        print "count:", cnt
-        print "position:",current_position
-        print "dy:", dy
-        print "-------------------", contact_judge(current_position)
-        print "goal:", dmp.goal
-
-        n,d = gpis.direction_func(current_position)
-        print "nnnnnnnnnnnnnnnn", n
-
-        if contact_judge(current_position):
-            direction = n
-            # print "nnnnnnnnn:", n
-
-        else:
-            direction = -n
-            # print "normal:", -n
-
-        external_force=avoid_obstacles(dy, direction, dmp.goal)
-        print "external_force:", external_force
-
-        y, dy, ddy = dmp.step(external_force=external_force*5)
-        dy = dy/np.linalg.norm(dy)
-
-        judge = True
-        interval = 100
-        dt = (y - current_position) / interval
-        n = 0
-
-        if prevent_insert(current_position):
-
-            while n < interval:
-                current_position += dt
-                judge = prevent_insert(current_position)
-                if not judge:
-                    current_position -= dt
-                    break
-                n += 1
-
-        # plt.scatter(current_position[0], current_position[1])
-        # plt.pause(0.001)
-
-        # dmp.y = current_position
-            y_track.append(np.copy(current_position))
-        cnt += 1
-
-    y_track = np.array(y_track)
-
-    plt.plot(y_track[:, 0], y_track[:, 1], lw = 2)
-    plt.plot(path_x, path_y)
-    plt.plot(x_, y_, c ="r")
-    plt.xlim(0, 11)
-    plt.ylim(-3, 3)
-    # plt.savefig("sliding1.png")
-    plt.show()
