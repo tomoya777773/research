@@ -81,6 +81,7 @@ class CanonicalSystem():
 if __name__ == "__main__":
 
     cs = CanonicalSystem(dt=.001, pattern='discrete')
+    print "cscscs", cs.dt
     # test normal rollout
     x_track1 = cs.rollout()
 

@@ -23,9 +23,9 @@ dmp = DMPs_discrete(dmps=2, bfs=100)
 
 dmp.imitate_path(y_des=np.array([x, y]))
 print dmp.goal
-dmp.goal[0] = 10
-dmp.goal[1] = 2
-y_track,dy_track,ddy_track = dmp.rollout()
+# dmp.goal[0] = 10
+# dmp.goal[1] = 1
+y_track,dy_track,ddy_track = dmp.rollout(tau=1.0)
 
 
 plt.plot(y_track[:, 0], y_track[:, 1], lw = 2)
