@@ -12,7 +12,6 @@ from tqdm import tqdm
 import random
 # from pyquaternion import Quaternion
 # import tf
-import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 class Path_Planning:
@@ -162,8 +161,8 @@ class Path_Planning:
         # ax.set_xlabel("X-axis")
         # ax.set_ylabel("Y-axis")
         # ax.set_zlabel("Z-axis")
-        ax.scatter(mean_x, mean_y, mean_z)
-        plt.show()
+        # ax.scatter(mean_x, mean_y, mean_z)
+        # plt.show()
         # # plt.pause(.01)
         # # plt.cla()
 
@@ -312,7 +311,7 @@ class VREP_UR5:
         self.orientation = Float32MultiArray()
 
         """データを読み込み"""
-        self.X = np.load("../data1/surf_sin_random_5000.npy")
+        self.X = np.load("../data1/surf_sin_known_5000.npy")
         # self.X = np.load("../data1/surf_sin_unknown_5000_1.npy")
 
         # fig = plt.figure()

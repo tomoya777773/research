@@ -86,7 +86,7 @@ for i in range(len(path_x)):
         # print "nnnnnnnnnnnn:", -n
 
     print dmp.y
-    y_track,dy_track,ddy_track = dmp.rollout(direction=direction)
+    y_track,dy_track,ddy_track = dmp.rollout()
     # print y_track[-1]
 
     if i == 0:

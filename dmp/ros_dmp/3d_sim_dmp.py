@@ -26,9 +26,9 @@ class VREP_UR5:
     Attributes
     ----------
     X : float
-        観測点(x,y,z)
+        Observation data (x,y,z)
     Y : -1, 0, 1
-        観測点の接触を判断するラベル
+        Label to determine contact in observation data
     """
 
     def __init__(self):
@@ -68,31 +68,28 @@ class VREP_UR5:
         self.position = Float32MultiArray()
         self.orientation = Float32MultiArray()
 
-        """データを読み込み"""
-        self.X = np.load("../data1/surf_sin_known_5000.npy")[1:500, :]
+        """load data"""
+        self.orbit_position = np.load("../data/circle_r4_36.npy")
+        self.X = np.load("../data/surf_sin_known_5000.npy")[1:1000, :]
         self.Y = np.zeros((self.X.shape[0], 1))
 
-        self.orbit_position = np.load("../data1/circle_r4_36.npy")
-        print self.orbit_position[:,0]
-
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        ax.set_xlabel("X-axis")
-        ax.set_ylabel("Y-axis")
-        ax.set_zlabel("Z-axis")
-        ax.scatter(self.orbit_position[:, 0], self.orbit_position[:, 1], self.orbit_position[:, 2], alpha = 0.5, color = "red")
-
-        plt.show()
-
-        self.path_x = np.linspace(0.36, 0.44, 100)
-        self.path_y = np.full(len(self.path_x), 0.01)
-        self.path_z = np.full(len(self.path_x), 1.32)
-
+        self.orbit_position[:, 2] -= 0.05
         self.position.data = np.array([self.orbit_position[:, 0][0], self.orbit_position[:, 1][0], self.orbit_position[:, 2][0]])
         self.force = 0
+        self.specified_distance = 0.008
 
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='3d')
+        # ax.scatter(self.orbit_position[:, 0], self.orbit_position[:, 1], self.orbit_position[:, 2], alpha = 0.5, color = "red")
+        # ax.scatter(self.X[:, 0], self.X[:, 1], self.X[:, 2], alpha = 0.5, color = "red")
+
+        # plt.show()
+
+        # self.path_x = np.linspace(0.36, 0.44, 100)
+        # self.path_y = np.full(len(self.path_x), 0.01)
+        # self.path_z = np.full(len(self.path_x), 1.32)
+        # self.paths = np.column_stack([self.path_x, self.path_y, self.path_z])
+        # self.position.data = np.array([self.path_x[0], self.path_y[0], self.path_z[0]])
 
     def start_sim(self):
         print 'start simulation'
@@ -175,194 +172,336 @@ class VREP_UR5:
 
         return orientation
 
-
-
-    def avoid_obstacles(self, dy, direction, goal):
-        beta = 1
-        gamma = 100
-        R_halfpi = np.array([[np.cos(np.pi / 2.0), -np.sin(np.pi / 2.0)],
-                            [np.sin(np.pi / 2.0), np.cos(np.pi / 2.0)]])
-
-        Rx_phi = np.array([[1, 0, 0],
-                           [0, np.cos(np.pi/2), -np.sin(np.pi/2)],
-                           [0, np.sin(np.pi/2), np.cos(np.pi/2)]])
-
-
-        Ry_phi = np.array([[np.cos(np.pi/2), 0, np.sin(np.pi/2)],
-                           [0, 1, 0],
-                           [-np.sin(np.pi/2), 0, np.cos(np.pi/2)]])
-
-        Rz_phi = np.array([[np.cos(np.pi/2), -np.sin(np.pi/2), 0],
-                           [np.sin(np.pi/2), np.cos(np.pi/2), 0],
-                           [0, 0, 1]])
-
-        p = np.zeros(3)
-        if np.linalg.norm(dy) > 1e-5:
-
-            phi_dy_x = -np.arctan2(dy[2], dy[1])
-            phi_dy_y = -np.arctan2(dy[0], dy[2])
-            phi_dy_z = -np.arctan2(dy[1], dy[0])
-
-
-            Rx_phi = np.array([[1, 0, 0],
-                            [0, np.cos(phi_dy_x), -np.sin(phi_dy_x)],
-                            [0, np.sin(phi_dy_x), np.cos(phi_dy_x)]])
-
-            Ry_phi = np.array([[np.cos(phi_dy_y), 0, np.sin(phi_dy_y)],
-                            [0, 1, 0],
-                            [-np.sin(phi_dy_y), 0, np.cos(phi_dy_y)]])
-
-            Rz_phi = np.array([[np.cos(phi_dy_z), -np.sin(phi_dy_z), 0],
-                            [np.sin(phi_dy_z), np.cos(phi_dy_z), 0],
-                            [0, 0, 1]])
-
-            d_vec = np.dot(Rx_phi, direction)
-            d_vec = np.dot(Ry_phi, d_vec)
-            d_vec = np.dot(Rz_phi, d_vec)
-
-            phi_x = np.arctan2(d_vec[2], d_vec[1])
-            phi_y = np.arctan2(d_vec[0], d_vec[2])
-            phi_z = np.arctan2(d_vec[1], d_vec[0])
-
-            dphi_x = gamma * phi_x * np.exp(-beta / abs(phi_x))
-            dphi_y = gamma * phi_y * np.exp(-beta / abs(phi_y))
-            dphi_z = gamma * phi_z * np.exp(-beta / abs(phi_z))
-
-            p = np.nan_to_num(np.dot(Rx_phi, dy) * dphi_x + np.dot(Ry_phi, dy) * dphi_y + np.dot(Rz_phi, dy) * dphi_z)
-
-        return p
-
-
-
-    def make_quat(self, alpha, axis):
+    def calculate_quaternion(self, alpha, axis):
         alpha_half = alpha / 2
         cosa = np.cos(alpha_half)
         sina = np.sin(alpha_half)
         v = sina * (axis / np.linalg.norm(np.array(axis, copy=False)))
         return Quat([v[0], v[1], v[2], cosa])
 
-    def contact_object(self, dy, direction, goal):
-        beta = 5
-        gamma = 200
+    def contact_object(self, dy, direction):
+        beta = 0.6
+        gamma = 10
         p = np.zeros(3)
         if np.linalg.norm(dy) > 1e-5:
             cos_phi = np.inner(dy, direction) / (np.linalg.norm(dy)*np.linalg.norm(direction))
             phi = np.arccos(cos_phi)
             cross = np.cross(dy, direction)
-            q1 = self.make_quat(phi, cross)
+            q1 = self.calculate_quaternion(phi, cross)
             R = q1.transform
 
             print "phi:", math.degrees(phi)
-            print "cross:", cross
-            print "R:", R
-            phi = 10
+            # print "cross:", cross
+            # print "R:", R
+            # phi = 10
             dphi = gamma * phi * np.exp(-beta / abs(phi))
-            p = np.nan_to_num(np.dot(R, dy) * dphi)
+            p = np.nan_to_num(np.dot(R, dy) * dphi )
+            # p = np.nan_to_num(np.dot(R, dy))
+
         return p
 
-    def main(self):
+    def Hesse_matrix(self, po_list):
+        regression_func = lambda param,x,y,z: z - (param[0]*x**2 + param[1]*y**2 + param[2]*x + param[3]*y + param[4])
+        param = [0, 0, 0, 0, 0]
+        # print "po_list:",po_list
+        optimized_param =  scipy.optimize.leastsq(regression_func, param, args=(po_list[:,0], po_list[:,1], po_list[:,2]))[0]
 
+        x = Symbol('x')
+        y = Symbol('y')
+
+        z = optimized_param[0]*x**2 + optimized_param[1]*y**2 + optimized_param[2]*x + optimized_param[3]*y + optimized_param[4]
+
+        hesse00 = np.array(diff(diff(z, x), x), dtype=np.float32)
+        hesse01 = np.array(diff(diff(z, y), x), dtype=np.float32)
+        hesse10 = hesse01.copy()
+        hesse11 = np.array(diff(diff(z, y), y), dtype=np.float32)
+
+        Hesse_matrix = np.array([[hesse00,hesse01], [hesse10,hesse11]])
+
+        eigenvalue,v = np.linalg.eig(Hesse_matrix)
+
+        return eigenvalue
+
+    def main(self):
+        """"Create GPIS """
         gpis = GaussianProcessImplicitSurface(self.X, self.Y, a=1)
 
-        dmp = DmpsGpis(dmps=3, bfs=500, dt= 0.01)
+        """Create DMPs"""
+        dmp = DmpsGpis(dmps=3, bfs=100, dt= 0.01, ay=np.ones(3) * 10)
         # dmp.imitate_path(y_des=np.array([self.path_x, self.path_y, self.path_z]))
         dmp.imitate_path(y_des=np.array([self.orbit_position[:,0], self.orbit_position[:,1], self.orbit_position[:,2]]))
-        # dy = np.array([10e-4, 10e-4, 10e-4])
-        dy = [0,0,0]
-        y_track = []
-        cnt = 1
-        current_position = self.position.data
 
 
         self.start_sim()
-        rospy.sleep(0.1)
+        self.publisher_position(self.position)
+        rospy.sleep(1)
 
-        # """物体に当たるまで直進"""
-        # while True:
-        #     if self.force == 0:
-        #         print "-----not contact-----"
-        #         self.position.data[2] -= 0.002
-        #         self.publisher_position(self.position)
+        dy_normalization = np.zeros_like( self.orbit_position.shape[1])
+        y_track = []
+        change_direction = False
+        change_t = 1
 
-        #     elif self.force == 1:
-        #         print "-----contact-----"
-        #         break
+        step = 1
 
-        #     rospy.sleep(0.1)
+        """Start search"""
+        for i in tqdm(range(self.orbit_position.shape[0]-1)):
+            print "\n"
+            print "STEP :" , step
 
-        # print "-----start serching-----"
-        # rospy.sleep(1)
-        print "aaaaaaa", abs(current_position[0] - dmp.goal[0])
+            const = 1
+            while const < 20:
 
-        while (np.linalg.norm(current_position - dmp.goal) > 10e-4) or (cnt < 10):
+                current_position = np.array(self.arm_position)
+                # orbit_position.append(current_position)
 
-            print abs(current_position[0] - dmp.goal[0])
+                distance = np.linalg.norm(current_position[0:2] - self.orbit_position[i+1][0:2], ord=2)
 
-            if cnt > 1000: break
+                print "-------------------------------------"
+                # print "count:", step
+                # print "current position:", current_position
+                # print "dy:", dy
+                # print "orbit:",self.orbit_position[i+1]
+                # print "distance: ", distance
+                # print "self distance", self.specified_distance
+                # print "-----------------------------------"
 
-            current_position = np.array(self.arm_position)
-            print "-----------------------------------"
-            print "count:", cnt
-            print "position:",current_position
-            print "dy:", dy
+                if distance < self.specified_distance:
+                    break
 
-            n,d = gpis.direction_func(current_position)
+                # if self.orbit_position[i][0] >= 0.38 and self.orbit_position[i][0] < 0.419 and self.orbit_position[i][1] < -0.025 and self.orbit_position[i][1] > -0.045 and distance < self.a * 10:
+                #     # if data_number < 35:
+                #     # if distance < self.a * 10:
+                #     break
 
-            if self.force == 1:
-                direction = n
-                d_judge = True
-                print "nnnnnnnnn:", n
+                if self.force == 1:
 
-            else:
-                direction = -n
-                d_judge = False
-                print "normal:", -n
+                    limit_X = self.X[np.where((self.X[:, 0] > current_position[0]-0.01)\
+                                            & (self.X[:, 0] < current_position[0]+0.01)\
+                                            & (self.X[:, 1] > current_position[1]-0.01)\
+                                            & (self.X[:, 1] < current_position[1]+0.01))]
 
-            # external_force=self.avoid_obstacles(dy, direction, dmp.goal)
-            external_force=self.contact_object(dy, direction, dmp.goal)
+                    eigenvalue = self.Hesse_matrix(limit_X)
+                    # print "limit_X:", limit_X
+                    # print "eigenvalue:", eigenvalue
 
-            print "external_force:", external_force
+                    n,d = gpis.direction_func(current_position, self.orbit_position[i+1])
 
-            y, dy, ddy = dmp.step()
-            dy = dy/np.linalg.norm(dy)
-            judge = True
-            interval = 10
-            dt = (y - current_position) / interval
-            n = 0
+                    if eigenvalue[0] < 0 and eigenvalue[1] < 0:
+                        direction = d
+                    else:
+                        direction = 0.3 * n + d
+                        direction /= np.linalg.norm(direction)
+                    print "tangent:", direction
 
-            if not d_judge:
-                while n < interval:
+                    d_judge = True
+                    # change_direction = False
+
+
+                    # if change_t == 0:
+                        # change_direction = True
+                        # print "dy:=================================", dmp.dy
+                        # dmp.dy = dmp.dy + 2*(-np.dot(dmp.dy,n)) * n
+                        # dy_normalization = dmp.dy/np.linalg.norm(dmp.dy)
+                        # print "dy:", dmp.dy
+
+                    # else:
+                    #     change_direction = False
+                    # change_t = 1
+
+                else:
+                    n,d = gpis.direction_func(current_position, self.orbit_position[i+1])
+
+                    direction = -n
+                    print "normal:", -n
+
+                    d_judge = False
+                    # change_t = 0
+                    # change_direction = False
+
+                external_force=self.contact_object(dy_normalization, direction)
+                print "external_force:", external_force
+
+                y, dy, ddy = dmp.step(tau=1, contact_judge=d_judge, external_force=external_force)
+                dy_normalization = dy/np.linalg.norm(dy)
+
+                judge = True
+                interval = 10
+                dt = (y - current_position) / interval
+                # dt =  0.03* direction / interval
+                n = 1
+
+                while n <= interval:
                     self.position.data = current_position + n * dt
                     self.publisher_position(self.position)
 
-                    if self.force == 1:
-                        # self.position.data -= dt
-                        # self.publisher_position(self.position)
+                    distance = np.linalg.norm(self.position.data[0:2] - self.orbit_position[i+1][0:2], ord=2)
+                    if distance < self.specified_distance:
+                        break
+                    elif (not d_judge and self.force == 1) or (d_judge and self.force == 0):
                         break
                     n += 1
-                    rospy.sleep(0.1)
+                    rospy.sleep(0.01)
 
-            else:
-                while n < interval:
-                    self.position.data = current_position + n * dt
-                    self.publisher_position(self.position)
-
-                    if self.force == 0:
-                        break
-                    n += 1
-                    rospy.sleep(0.1)
-                    print self.position.data
-
-
+                # current_position = self.position.data
                 y_track.append(np.copy(self.arm_position))
-            cnt += 1
+                rospy.sleep(0.01)
+                const += 1
 
-            rospy.sleep(0.1)
+            step += 1
+
         y_track = np.array(y_track)
 
         self.stop_sim()
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(y_track[:, 0], y_track[:, 1], y_track[:, 2], alpha = 0.5, color = "red")
+        ax.scatter(self.X[:, 0], self.X[:, 1], self.X[:, 2], alpha = 0.5, color = "red")
+
+        plt.show()
 
 
 if __name__=='__main__':
     VU = VREP_UR5()
     VU.main()
+
+
+
+
+
+
+
+    # def main(self):
+
+    #     gpis = GaussianProcessImplicitSurface(self.X, self.Y, a=1)
+
+    #     dmp = DmpsGpis(dmps=3, bfs=100, dt= 0.01)
+    #     dmp.imitate_path(y_des=np.array([self.path_x, self.path_y, self.path_z]))
+    #     # dmp.imitate_path(y_des=np.array([self.orbit_position[:,0], self.orbit_position[:,1], self.orbit_position[:,2]]))
+    #     # dy = np.array([10e-4, 10e-4, 10e-4])
+
+    #     dy_normalization = np.zeros_like( self.orbit_position.shape[1])
+    #     y_track = []
+    #     cnt = 1
+    #     current_position = self.position.data
+    #     change_direction = False
+    #     change_t = 1
+
+    #     self.start_sim()
+
+    #     self.publisher_position(self.position)
+
+    #     rospy.sleep(1)
+
+    #     # """物体に当たるまで直進"""
+    #     # while True:
+    #     #     if self.force == 0:
+    #     #         print "-----not contact-----"
+    #     #         self.position.data[2] -= 0.002
+    #     #         self.publisher_position(self.position)
+
+    #     #     elif self.force == 1:
+    #     #         print "-----contact-----"
+    #     #         break
+
+    #     #     rospy.sleep(0.1)
+
+    #     # print "-----start serching-----"
+    #     # rospy.sleep(1)
+
+    #     while (np.linalg.norm(current_position[0] - dmp.goal[0]) > 10e-3) or (cnt < 10):
+    #         if cnt > 1000: break
+
+    #         current_position = np.array(self.arm_position)
+
+    #         print "-----------------------------------"
+    #         print "count:", cnt
+    #         print "position:",current_position
+    #         # print "dy:", dy
+
+    #         n,d = gpis.direction_func(current_position)
+    #         # n,d = gpis.direction_func(current_position, self.orbit_position[cnt])
+
+    #         if self.force == 1:
+
+    #             limit_X = self.X[np.where((self.X[:, 0] > current_position[0]-0.01)\
+    #                                     & (self.X[:, 0] < current_position[0]+0.01)\
+    #                                     & (self.X[:, 1] > current_position[1]-0.01)\
+    #                                     & (self.X[:, 1] < current_position[1]+0.01))]
+
+    #             eigenvalue = self.Hesse_matrix(limit_X)
+    #             print "eigenvalue:", eigenvalue
+
+    #             n,d = gpis.direction_func(current_position, data_number=limit_X.shape[0])
+
+    #             if eigenvalue[0] < 0 and eigenvalue[1] < 0: # 上に凸のとき
+    #                 direction = d
+    #             else:
+    #                 direction = 0.1 * n + d
+
+    #             d_judge = True
+
+    #             change_direction = False
+    #             change_t = 0
+    #             print "nnnnnnnnn:", n
+
+    #         else:
+    #             n,d = gpis.direction_func(current_position)
+
+    #             direction = -n
+    #             d_judge = False
+    #             if change_t == 0:
+    #                 change_direction = True
+    #             else:
+    #                 change_direction = False
+    #             change_t = 1
+    #             print "normal:", -n
+
+    #         # external_force=self.avoid_obstacles(dy, direction, dmp.goal)
+    #         external_force=self.contact_object(dy_normalization, direction)
+
+    #         print "external_force:", external_force
+    #         # if cnt != 1:
+    #         #     dmp.dy = dmp.dy/np.linalg.norm(dmp.dy)
+
+    #         y, dy, ddy = dmp.step(state_fb=current_position,
+    #                               external_force=external_force/1000, change_direction=change_direction)
+    #         dy_normalization = dy/np.linalg.norm(dy)
+
+    #         judge = True
+    #         interval = 10
+    #         dt = (y - current_position) / interval
+    #         n = 0
+    #         # print "333333333333333333", y-current_position
+    #         # print "y:", y
+    #         # print "current:", current_position
+    #         if not d_judge:
+    #             while n < interval:
+    #                 self.position.data = current_position + n * dt
+    #                 self.publisher_position(self.position)
+
+    #                 if self.force == 1:
+    #                     break
+    #                 n += 1
+    #                 rospy.sleep(0.01)
+
+    #         else:
+    #             while n < interval:
+    #                 self.position.data = current_position + n * dt
+    #                 self.publisher_position(self.position)
+
+    #                 if self.force == 0:
+    #                     break
+    #                 n += 1
+    #                 rospy.sleep(0.01)
+
+    #         # current_position = self.position.data
+    #         y_track.append(np.copy(self.arm_position))
+    #         cnt += 1
+
+    #         rospy.sleep(0.01)
+
+
+    #     y_track = np.array(y_track)
+
+    #     self.stop_sim()

@@ -104,7 +104,7 @@ if __name__ == '__main__':
             external_force=contact_object_n(dy, direction)
             # print "normal:", -n
 
-        # external_force=contact_object(dy, direction)
+        external_force=contact_object_n(dy, direction)
         print "external_force:", external_force
 
         y, dy, ddy = dmp.step(tau=1, external_force=external_force, contact_judge=d_judge)

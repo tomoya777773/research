@@ -18,7 +18,6 @@ class DmpsGpis(DMPs):
 
         self.check_offset()
 
-
     def gen_centers(self):
         """Set the centre of the Gaussian basis
         functions be spaced evenly throughout run time"""
@@ -87,7 +86,7 @@ class DmpsGpis(DMPs):
                 denom = np.sum(x_track**2 * psi_track[:,b])
                 self.w[d,b] = numer / (k * denom)
 
-    def step(self, tau=1.0, state_fb=None, external_force=None, contact_judge=False):
+    def step(self, tau=1.0, state_fb=None, external_force=None, contact_judge=None):
         """Run the DMP system for a single timestep.
 
        tau float: scales the timestep
@@ -108,26 +107,65 @@ class DmpsGpis(DMPs):
         # generate basis function activation
         psi = self.gen_psi(x)
 
+
         for d in range(self.dmps):
 
             # generate the forcing term
             f = self.gen_front_term(x, d) * (np.dot(psi, self.w[d])) / np.sum(psi)
-            print "-----------------"
-            print  self.ddy[d]
-            print self.y[d]
 
-            print "23333333333333333333333333:::", self.ay[d] * (self.by[d] * (self.goal[d] - self.y[d]) - self.dy[d]/tau)
-            print "fffffffffffffffffffffffff", f
+            # print "-----------------"
+            # print "ddy:", self.ddy[d]
+            # print "dy:", self.dy[d]
+            # print "y:", self.y[d]
+
             # DMP acceleration
             self.ddy[d] = self.ay[d] * (self.by[d] * (self.goal[d] - self.y[d]) - self.dy[d]/tau) + f
             if external_force is not None:
                 self.ddy[d] += external_force[d]
+
             # if contact_judge:
-            #     self.ddy[d] -= f
+            #     self.ddy[d] -=  f
+
             self.ddy[d] *= tau**2
-            self.dy[d] += self.ddy[d] * self.dt * cs_args['error_coupling']
+            self.dy[d] = self.ddy[d] * self.dt * cs_args['error_coupling']
             self.y[d] += self.dy[d] * self.dt * cs_args['error_coupling']
-            print  self.ddy[d]
-            print self.dy[d]
-            print self.y[d]
+
+            # print "ddy:", self.ddy[d]
+            # print "dy:", self.dy[d]
+            # print "y:", self.y[d]
+
         return self.y, self.dy, self.ddy
+
+
+        # for d in range(self.dmps):
+
+        #     # generate the forcing term
+        #     f = self.gen_front_term(x, d) * (np.dot(psi, self.w[d])) / np.sum(psi)
+
+
+        #     # print "-----------------"
+        #     # print "ddy:", self.ddy[d]
+        #     # print "dy:", self.dy[d]
+        #     # print "y:", self.y[d]
+
+        #     # DMP acceleration
+        #     self.ddy[d] = self.ay[d] * (self.by[d] * (self.goal[d] - self.y[d]) - self.dy[d]/tau) + f
+        #     if external_force is not None:
+        #         self.ddy[d] = external_force[d] * 10
+
+        #     # if contact_judge:
+        #     #     self.ddy[d] -= f
+
+        #     self.ddy[d] *= tau**2
+        #     self.dy[d] = self.ddy[d] * self.dt * cs_args['error_coupling']
+
+        #     # if external_force is not None:
+        #     #     self.dy[d] += external_force[d] * 0.02
+
+        #     self.y[d] += self.dy[d] * self.dt * cs_args['error_coupling']
+
+        #     # print "ddy:", self.ddy[d]
+        #     # print "dy:", self.dy[d]
+        #     # print "y:", self.y[d]
+
+        # return self.y, self.dy, self.ddy
