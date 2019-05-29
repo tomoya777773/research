@@ -147,12 +147,13 @@ if __name__ == '__main__':
     print "ave:", np.average(dy_track)
     # plt.plot(np.arange(len(dy_track)), dy_track[:, 0])
     # plt.ylim(-5, 40)
+    plt.plot(range(len(dy_track[:, 0])), dy_track[:, 1], lw = 2)
 
-    plt.plot(y_track[:, 0], y_track[:, 1], lw = 2)
-    plt.plot(path_x, path_y)
-    plt.plot(x_, y_, c ="r")
-    plt.xlim(0, 11)
-    plt.ylim(-3, 3)
+    # plt.plot(y_track[:, 0], y_track[:, 1], lw = 2)
+    # plt.plot(path_x, path_y)
+    # plt.plot(x_, y_, c ="r")
+    # plt.xlim(0, 11)
+    # plt.ylim(-3, 3)
     plt.show()
 
 

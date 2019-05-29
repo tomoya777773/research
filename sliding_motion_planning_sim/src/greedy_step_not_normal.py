@@ -311,7 +311,7 @@ class VREP_UR5:
         self.orientation = Float32MultiArray()
 
         """データを読み込み"""
-        self.X = np.load("../data1/surf_sin_known_5000.npy")
+        self.X = np.load("../data1/surf_sin_unknown_5000.npy")
         # self.X = np.load("../data1/surf_sin_unknown_5000_1.npy")
 
         # fig = plt.figure()

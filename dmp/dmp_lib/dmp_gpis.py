@@ -123,11 +123,10 @@ class DmpsGpis(DMPs):
             if external_force is not None:
                 self.ddy[d] += external_force[d]
 
-            # if contact_judge:
-            #     self.ddy[d] -=  f
-
             self.ddy[d] *= tau**2
-            self.dy[d] = self.ddy[d] * self.dt * cs_args['error_coupling']
+
+            self.dy[d] += self.ddy[d] * self.dt * cs_args['error_coupling']
+
             self.y[d] += self.dy[d] * self.dt * cs_args['error_coupling']
 
             # print "ddy:", self.ddy[d]

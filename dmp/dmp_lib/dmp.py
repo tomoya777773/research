@@ -52,7 +52,7 @@ class DMPs(object):
 
         for d in range(self.dmps):
             if (self.y0[d] == self.goal[d]):
-                self.goal[d] += 1e-4
+                self.goal[d] += 1e-5
 
     def gen_front_term(self, x, dmp_num): raise NotImplementedError()
 
@@ -185,7 +185,7 @@ class DMPs(object):
             # generate the forcing term
             f = self.gen_front_term(x, d) * (np.dot(psi, self.w[d])) / np.sum(psi)
             # DMP acceleration
-            self.ddy[d] = (self.ay[d] * (self.by[d] * (self.goal[d] - self.y[d]) - self.dy[d]) + f) * tau**2
+            self.ddy[d] = (self.ay[d] * (self.by[d] * (self.goal[d] - self.y[d]) - self.dy[d]/tau) + f) * tau**2
             self.dy[d] += self.ddy[d] * self.dt * cs_args['error_coupling']
             self.y[d] += self.dy[d] * self.dt * cs_args['error_coupling']
 

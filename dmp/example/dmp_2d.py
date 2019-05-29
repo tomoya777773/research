@@ -29,7 +29,9 @@ y_track,dy_track,ddy_track = dmp.rollout(tau=1.0)
 
 
 plt.plot(y_track[:, 0], y_track[:, 1], lw = 2)
-plt.plot(x, y, lw = 2)
-plt.xlim(0, 15)
-plt.ylim(-1, 1.5)
+# plt.plot(x, y, lw = 2)
+# plt.plot(range(len(y_track[:, 0])), dy_track[:, 0], lw = 2)
+
+# plt.xlim(0, 15)
+# plt.ylim(-1, 1.5)
 plt.show()

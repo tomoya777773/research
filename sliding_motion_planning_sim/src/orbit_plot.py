@@ -6,10 +6,10 @@ import numpy as np
 import random
 from tqdm import tqdm
 
-orbit_position = np.load("../data1/orbit_position_unknown.npy")
+orbit_position = np.load("../data1/surf_sin_unknown2_5000.npy")
 print orbit_position
 
-plt.plot(orbit_position[:,0], orbit_position[:,1])
-plt.plot(orbit_position[0][0], orbit_position[0][1], c="red")
+plt.scatter(orbit_position[:,0], orbit_position[:,1])
+# plt.plot(orbit_position[0][0], orbit_position[0][1], c="red")
 
 plt.show()
