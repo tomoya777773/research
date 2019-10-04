@@ -93,7 +93,7 @@ def make_test_data():
     N = 30
     theta = np.linspace(-np.pi, np.pi, N)
     phi   = np.linspace(0, np.pi/2, N)
-    r     = np.linspace(0.15, 0.45, N)
+    r     = np.linspace(0.2, 0.5, N)
 
     THETA, PHI, R = np.meshgrid(theta, phi, r)
 
@@ -112,11 +112,11 @@ if __name__=="__main__":
 
     # object position
     inside_surface  = np.load("../data/ellipse/ellipse_po_20_2d.npy")
-    outside_surface = np.load("../data/ellipse/ellipse_po_21_2d.npy")
+    outside_surface = np.load("../data/ellipse/ellipse_po_30_2d.npy")
     radius = 0.2
 
     # Task 1
-    X1 = np.load("../data/ellipse/ellipse_po_21.npy")
+    X1 = np.load("../data/ellipse/ellipse_po_30.npy")
     Y1 = np.zeros(len(X1))[:, None]
     T1 = 0
 

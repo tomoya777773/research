@@ -20,10 +20,13 @@ class MultiTaskGaussianProcessImplicitSurfaces:
         self.z_limit = z_limit
         self.kernel = kernel
 
-        self.task_kernel_params = torch.Tensor(task_kernel_params)
+        self.task_kernel_params = task_kernel_params
+
+        self.t_params = torch.Tensor([self.task_kernel_params[0][0], self.task_kernel_params[1][0], self.task_kernel_params[1][1]])
 
         L   = torch.exp(torch.Tensor(self.task_kernel_params))
         self.task_kernel = torch.mm(L, L.T)
+        print self.task_kernel
 
         self.KX   = self.kernel(self.X, self.X)
         KT        = self.task_kernel[self.T, self.T.T]
@@ -31,22 +34,6 @@ class MultiTaskGaussianProcessImplicitSurfaces:
         self.invL = torch.solve(torch.eye(L.size()[0]), L)[0]
         self.invK = torch.mm(self.invL.T, self.invL)
 
-
-
-    def task_to_psd_matrix(self, task_kernel_params):
-        L   = torch.exp(torch.Tensor(task_kernel_params))
-        res = torch.mm(L, L.T)
-        # print res
-        L   = np.exp(task_kernel_params)
-        res = np.dot(L, L.T)
-        # print res
-        return res
-
-    def calculate_inv(self, K):
-        L = np.linalg.cholesky(K)
-        inv_L = np.linalg.solve(L, np.eye(L.shape[0]))
-        inv_K = np.dot(inv_L.T, inv_L)
-        return inv_K
 
     def predict(self, x, t):
         t   = torch.ones(x.size()[0], dtype=torch.long) * t
@@ -69,72 +56,56 @@ class MultiTaskGaussianProcessImplicitSurfaces:
         return mean, cov
 
     def compute_grad(self, flag):
-        self.task_kernel_params.requires_grad = flag
+        self.t_params.requires_grad = flag
+
 
     def negative_log_likelihood(self):
-        # task_kern = self.task_K()
-        # # KT = [[task_kern[int(x)][int(y)] for x in self.T.flatten()] for y in self.T.flatten()]
-        # KT = task_kern[self.T, self.T.t()]
-        # K = KT*self.kern.K(self.X) + torch.eye(self.X.shape[0])*torch.exp(self.sigma)
 
+        task_kernel_params = torch.zeros(2,2)
+        task_kernel_params[0][0] = self.t_params[0]
+        task_kernel_params[1][0] = self.t_params[1]
+        task_kernel_params[1][1] = self.t_params[2]
 
-        # invKY = torch.solve(self.Y, K)[0]
-        # # logdet = torch.cholesky(K, upper=False).diag().log().sum()
-        # logdet = torch.logdet(K)
-
-        # return (logdet + self.Y.t().mm(invKY))
-
-
-        # task_kernel_params = np.array( [ [ params[0], 0 ], [ params[1], params[2] ] ] )
-
-        task_kernel_params = self.task_kernel_params
-
-        L   = torch.exp(torch.Tensor(task_kernel_params))
+        L   = torch.exp(task_kernel_params)
         task_kernel = torch.mm(L, L.T)
 
         KT = task_kernel[self.T, self.T.T]
-        # print KT
-        # print torch.from_numpy(self.KX).float()
-        # print KT * torch.from_numpy(self.KX).float()
-        # print torch.eye(self.X.shape[0]) * self.sigma_y**2
-
-        # K   = KT * torch.from_numpy(self.KX).float() + torch.eye(self.X.size()[0]) * self.sigma_y**2
-        K   = KT * torch.from_numpy(self.KX).float() + torch.eye(self.X.shape[0]) * self.sigma_y**2
+        K   = KT * self.KX + torch.eye(self.X.size()[0]) * self.sigma_y**2
 
         L    = torch.cholesky(K)
         invL = torch.solve(torch.eye(L.size()[0]), L)[0]
         invK = torch.mm(invL.T, invL)
 
-        Y_m = torch.from_numpy(self.Y - self.m).float()
-        # print Y_m.T.size()
-        # print invK.size()
+        Y_m = self.Y - self.m
 
         return  torch.logdet(K) + Y_m.T.mm(invK).mm(Y_m)
-
-
 
 
     def learning(self):
         max_iter = 100
 
         self.compute_grad(True)
-        param = [self.task_kernel_params]
-        # optimizer = torch.optim.Adam(param, lr=0.001)
-        optimizer = torch.optim.LBFGS(param, history_size=20, max_iter=200)
+        param = [self.t_params]
+        optimizer = torch.optim.Adam(param, lr=0.001)
+        # optimizer = torch.optim.LBFGS(param, history_size=50, max_iter=200)
 
         for i in range(max_iter):
             optimizer.zero_grad()
             f = self.negative_log_likelihood()
             f.backward()
-            def closure():
-                optimizer.zero_grad()
-                with torch.autograd.detect_anomaly():
-                    f = self.negative_log_likelihood()
-                    f.backward()
-                return f
-            optimizer.step(closure)
-        # optimizer.step()
+            # def closure():
+            #     optimizer.zero_grad()
+            #     with torch.autograd.detect_anomaly():
+            #         f = self.negative_log_likelihood()
+            #         f.backward()
+            #     return f
+            # optimizer.step(closure)
+            optimizer.step()
         self.compute_grad(False)
+
+        self.task_kernel_params[0][0] = self.t_params[0]
+        self.task_kernel_params[1][0] = self.t_params[1]
+        self.task_kernel_params[1][1] = self.t_params[2]
 
 
 

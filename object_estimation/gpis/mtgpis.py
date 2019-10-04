@@ -75,8 +75,7 @@ class MultiTaskGaussianProcessImplicitSurfaces:
 
         KT = task_kernel[self.T, self.T.T]
 
-        Eye = np.eye(self.X.shape[0]) * self.sigma_y**2
-        K   = KT * self.KX + Eye
+        K   = KT * self.KX + np.eye(self.X.shape[0]) * self.sigma_y**2
 
         L = np.linalg.cholesky(K)
         invL = np.linalg.solve(L, np.eye(L.shape[0]))
