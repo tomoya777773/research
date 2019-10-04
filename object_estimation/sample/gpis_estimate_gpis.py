@@ -1,0 +1,263 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+sys.path.append("../")
+from kernel import InverseMultiquadricKernel
+
+from gpis import GaussianProcessImplicitSurfaces
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import BoundaryNorm
+from matplotlib.ticker import MaxNLocator
+from matplotlib import cm
+plt.style.use("ggplot")
+
+from mpl_toolkits.mplot3d import Axes3D
+
+
+def mean_0_position(x,y,z, mm, ss):
+    mm = mm.reshape(x.shape)
+    ss = ss.reshape(x.shape)
+    print mm.shape
+    mm0 = np.argmin(np.abs(mm), axis = 2)
+
+    mm0_x, mm0_y, mm0_z, ss0 = [], [], [], []
+    for i in range(len(x)):
+        for j in range(len(x)):
+            mm0_x.append(x[i][j][mm0[i][j]])
+            mm0_y.append(y[i][j][mm0[i][j]])
+            mm0_z.append(z[i][j][mm0[i][j]])
+            ss0.append(ss[i][j][mm0[i][j]])
+
+    N = len(x)
+    mm0_x = np.array(mm0_x).reshape((N, N))
+    mm0_y = np.array(mm0_y).reshape((N, N))
+    mm0_z = np.array(mm0_z).reshape((N, N))
+    ss0   = np.array(ss0).reshape((N, N))
+
+    return mm0_x, mm0_y, mm0_z, ss0
+
+def mtgpis_plot_3d(X1, X2, mm0_po, ss):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1, projection='3d')
+    # ax.scatter3D(mm2_x, mm2_y, mm2_z)
+
+    ax.scatter3D(X1[:, 0], X1[:, 1], X1[:, 2], alpha=0.1)
+    ax.scatter3D(X2[:, 0], X2[:, 1], X2[:, 2], s=100, c="green", edgecolors="red")
+
+    # print mm0_po[0].shape
+    # x = mm0_po[0][mm0_po[2] > 0]
+    # y = mm0_po[1][mm0_po[2] > 0]
+    # z = mm0_po[2][mm0_po[2] > 0]
+    # print z.shape
+    # ss = ss[mm0_po[2] > 0]
+
+    N = ss/ss.max()
+    ax.plot_surface(mm0_po[0], mm0_po[1], mm0_po[2], facecolors=cm.jet(N), linewidth=0, rstride=1, cstride=1, antialiased=True)
+    # ax.plot_surface(x,y,z, facecolors=cm.jet(N), linewidth=0, rstride=1, cstride=1, antialiased=True)
+
+    m = cm.ScalarMappable(cmap=cm.jet)
+    m.set_array(ss)
+    cbar = plt.colorbar(m)
+
+    # ax.set_xlim(0,1)
+    ax.set_zlim(-0.3, 0.3)
+
+    # fig.colorbar(cf)
+    # plt.show()
+
+def plot_sphere(r):
+    theta, phi = np.linspace(0, np.pi, 20), np.linspace(0, np.pi/2, 20)
+    # theta, phi = np.linspace(np.pi/8, np.pi/8*7, 1), np.linspace(np.pi/8, np.pi/9*4, 1)
+
+    THETA, PHI = np.meshgrid(theta, phi)
+    R = np.cos(PHI) * r*2
+    X = R * np.sin(PHI) * np.cos(THETA)
+    Z = R * np.sin(PHI) * np.sin(THETA)
+    Y = R * np.cos(PHI) - r
+
+    # print X.shape
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(1,1,1, projection='3d')
+    plot = ax.plot_surface(
+        X, Y, Z, rstride=1, cstride=1, linewidth=0, antialiased=False)
+
+    # plt.show()
+
+def judge_sphere(position):
+    r = 0.2
+    x,y,z = position
+    judge = (x**2 + y**2 + z**2) - r**2
+    print(judge)
+    if judge < 0: # in
+        return -1
+    elif judge > 0 and round(judge, 4) == 0: # on
+        return 0
+    else: # out
+        return 1
+
+
+
+if __name__=="__main__":
+    # # 入力ノイズと出力ノイズの初期設定
+    # data_sigma_x = 0.001
+    # data_sigma_y = 0.001
+
+    # Task 1
+    X1 = np.load("../data/sphere_po.npy")
+    Y1 = np.zeros(len(X1))[:, None]
+    T1 = 0
+
+    # Task 2
+    X2 = np.array([[0.01, 0.01,0.4], [-0.002, -0.003, 0.3]])
+    Y2 = np.array([[1], [1]])
+    T2 = 1
+
+
+    # test data
+    N = 20
+    x_t   = np.linspace(-0.25, 0.25, N, dtype=np.float32)
+    y_t   = np.linspace(-0.25, 0.25, N, dtype=np.float32)
+    z_t   = np.linspace(0, 0.25, N, dtype=np.float32)
+
+    x_t, y_t, z_t = np.meshgrid(x_t, y_t, z_t)
+    xx  = x_t.ravel()[:, None]
+    yy  = y_t.ravel()[:, None]
+    zz  = z_t.ravel()[:, None]
+    XX = np.concatenate([xx, yy, zz], 1)
+
+
+    kernel = InverseMultiquadricKernel([0.3])
+
+    # Show environment
+    fig = plt.figure(figsize=(40, 40), dpi=50)
+    ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter3D(X1[:, 0], X1[:, 1], X1[:, 2], s=100, alpha=0.1)
+    plot_sphere(0.2)
+
+    # Go straight toward the object
+    current_po = np.array([0.01, 0.01, 0.3])
+    while True:
+        if judge_sphere([current_po[0], current_po[1], current_po[2]-0.005]) == -1:
+            break
+        current_po[2] -= 0.005
+
+        ax.plot([current_po[0]], [current_po[1]], [current_po[2]],  "o-", color="#00aa00", ms=30, mew=5)
+        plt.pause(0.001)
+
+    current_po = current_po[:,None].T
+    X2 = np.append(X2, current_po, axis=0)
+    Y2 = np.append(Y2, [0])[:,None]
+
+
+    alpha = 0.01
+    for i in range(40):
+            gp_model           = GaussianProcessImplicitSurfaces(X2, Y2, kernel)
+            normal, direrction = gp_model.predict_direction(current_po)
+            current_po        += alpha * direrction.T
+
+            ax.plot([current_po[0][0]], [current_po[0][1]], [current_po[0][2]],  "o-", color="#00aa00", ms=30, mew=5)
+            plt.pause(0.001)
+
+            X2 = np.append(X2, current_po, axis=0)
+            Y2 = np.append(Y2, [0])[:,None]
+
+            judge = judge_sphere(current_po[0])
+            if judge == 0:
+                continue
+            elif judge == 1:
+                while True:
+                    if judge_sphere((current_po - 0.005 * normal.T)[0]) == -1:
+                        break
+                    current_po -= 0.005 * normal.T
+            else:
+                while True:
+                    if judge_sphere((current_po + 0.005 * normal.T)[0]) == 1:
+                        break
+                    current_po += 0.005 * normal.T
+
+
+    mm2, ss2 = gp_model.predict(XX)
+    mm2_x, mm2_y, mm2_z, ss2 = mean_0_position(x_t, y_t, z_t, mm2, ss2)
+    mtgpis_plot_3d(X1, X2, [mm2_x, mm2_y, mm2_z], ss2)
+
+    plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # N = 20
+    # x   = np.linspace(-0.25, 0.25, N, dtype=np.float32)
+    # y   = np.linspace(-0.25, 0.25, N, dtype=np.float32)
+    # z   = np.linspace(0, 0.25, N, dtype=np.float32)
+    # x,y,z = np.meshgrid(x, y, z)
+    # xx  = x.ravel()[:, None]
+    # yy  = y.ravel()[:, None]
+    # zz  = z.ravel()[:, None]
+
+    # XX  = np.concatenate([xx, yy, zz], 1)
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter3D(xx, yy, zz, alpha=0.1)
+    # plt.show()
+
+    # # カーネルの選択とパラメータの初期化
+    # kernel = InverseMultiquadricKernel([0.3])
+
+    # # マルチガウス過程回帰のモデルを生成
+
+
+    # # GPIS
+    # model1 = GPISEstimation(X2, Y2, kernel)
+    # mm2, ss2 = model1.predict(XX)
+    # mm2_x, mm2_y, mm2_z, ss2 = mean_0_position(x,y,z, mm2, ss2)
+    # mtgpis_plot_3d(X1, X2, [mm2_x, mm2_y, mm2_z], ss2, x,y,z)
+
+
+    # # MTGPIS
+    # model  = MTGPISEstimation([X1,X2], [Y1,Y2], [T1,T2], kernel)
+
+    # # MTGP before optimize paramater
+    # print("========== STEP 1 ==========")
+
+    # mm1, ss1 = model.predict(XX, T1)
+    # mm2, ss2 = model.predict(XX, T2)
+    # mm2_x, mm2_y, mm2_z, ss2 = mean_0_position(x,y,z, mm2, ss2)
+    # mtgpis_plot_3d(X1, X2, [mm2_x, mm2_y, mm2_z], ss2, x,y,z)
+
+    # # MTGP after optimize paramater
+    # print("========== STEP 2 ==========")
+    # print("------------------------------")
+    # print("aaaaaaaaaaaaaaaaa",model.task_to_psd_matrix())
+    # model.learn_params()
+    # print("bbbbbbbbbbbbbbbbb",model.task_to_psd_matrix())
+    # print("-----------------------------")
+
+    # # mm1, ss1 = model.predict(XX, T1)
+    # mm2, ss2 = model.predict(XX, T2)
+    # mm2_x, mm2_y, mm2_z, ss2 = mean_0_position(x,y,z, mm2, ss2)
+
+    # mtgpis_plot_3d(X1, X2, [mm2_x, mm2_y, mm2_z], ss2, x,y,z)
