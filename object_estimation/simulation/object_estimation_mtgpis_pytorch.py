@@ -19,10 +19,11 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from sklearn.metrics import mean_squared_error
 import time
+import copy
 
 # hyper parameter
 alpha = 0.03
-kernel_param = 0.4
+kernel_param = 0.5
 
 # save data
 error_list, var_ave_list = [], []
@@ -55,11 +56,10 @@ def get_object_position(x,y,z, mean, var, r):
 
     return [mean0_x, mean0_y, mean0_z], var0, error, var_ave
 
-
 def plot_estimated_surface(position, var):
     N = var
-    print N.min()
-    print N.max()
+    # print N.min()
+    # print N.max()
     ax.plot_surface(position[0], position[1], position[2],facecolors=cm.rainbow(N),
     linewidth=0, rstride=1, cstride=1, antialiased=False, shade=False, vmin=N.min(), vmax=N.max())
 
@@ -93,7 +93,7 @@ def make_test_data():
     N = 30
     theta = np.linspace(-np.pi, np.pi, N)
     phi   = np.linspace(0, np.pi/2, N)
-    r     = np.linspace(0.2, 0.5, N)
+    r     = np.linspace(0.1, 0.6, N)
 
     THETA, PHI, R = np.meshgrid(theta, phi, r)
 
@@ -119,11 +119,20 @@ if __name__=="__main__":
     X1 = np.load("../data/ellipse/ellipse_po_30.npy")
     Y1 = np.zeros(len(X1))[:, None]
     T1 = 0
+    # print X1.shape
+    # tmp = copy.copy(X1)
+    # tmp[:,2] += 0.1
+    # print X1
+    # print tmp
+    # X1 = np.append(X1, tmp, axis=0)
+    # Y1 = np.append(Y1, np.ones(len(Y1))[:, None], axis=0)
+
 
     # Task 2
     X2 = np.array([[-0.04, 0.04, 0.3],[-0.04, -0.04, 0.3], [0.04, -0.04, 0.3], [0.04, 0.04, 0.3]])
     Y2 = np.array([[1], [1], [1], [1]])
     T2 = 1
+
 
     # test data
     X, Y, Z, XX = make_test_data()
@@ -152,6 +161,7 @@ if __name__=="__main__":
         # ax.scatter3D(X1[:,0], X1[:,1], X1[:,2])
         plot_environment(inside_surface, outside_surface)
         plot_path(position_list)
+        # plt.show()
         plt.pause(0.001)
         plt.clf()
         ########################################## Plot ###################################################################
@@ -165,13 +175,15 @@ if __name__=="__main__":
             print "========================================================================="
             print "STEP: {}".format(i)
 
-            if i == 0:
-                tmp = torch.Tensor([[1, 1], [1, 1]])
-                task_kernel = torch.triu(tmp.T).T
-            else:
-                task_kernel = gp_model.task_kernel_params
+            # if i == 0:
+            # tmp = torch.Tensor([[10e-4, 10e-4], [10e-4, 10e-4]])
+            task_kernel_params = torch.Tensor([[10e-4, 10e-4], [10e-4, 10e-4]])
+            # else:
+                # task_kernel_params = gp_model.task_kernel_params
+                # kernel.params = gp_model.kernel.params
             print "-----------------------------------------------"
-            print task_kernel
+            # print task_kernel_params
+            # print kernel.params
 
             X1_t = torch.from_numpy(X1).float()
             X2_t = torch.from_numpy(X2).float()
@@ -179,7 +191,8 @@ if __name__=="__main__":
             Y2_t = torch.from_numpy(Y2).float()
 
             gp_model = MultiTaskGaussianProcessImplicitSurfaces([X1_t, X2_t], [Y1_t, Y2_t], [T1,T2],
-                                                    kernel, task_kernel, c=100, z_limit=0.05)
+                                                    kernel, task_kernel_params, c=5, z_limit=0.04)
+            # task_kernel_params = gp_model.task_kernel_params
 
 
             # t1 = time.time()
@@ -200,6 +213,8 @@ if __name__=="__main__":
             estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
             error_list.append(error)
             var_ave_list.append(var_ave)
+            print "error:", error
+            print "var:", var_ave
 
             ########################################## Plot ###################################################################
             ax = fig.add_subplot(111, projection='3d')

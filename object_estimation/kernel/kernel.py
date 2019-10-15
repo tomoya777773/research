@@ -69,7 +69,7 @@ class InverseMultiquadricKernel:
 
 class InverseMultiquadricKernelPytouch:
     def __init__(self, params):
-        self.params = params
+        self.params = torch.Tensor(params)
 
     def __call__(self, x, y):
         sum_x_2 = torch.sum(x**2, dim=1)[:, None]

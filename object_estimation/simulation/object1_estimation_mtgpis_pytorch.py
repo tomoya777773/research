@@ -4,11 +4,14 @@
 import sys
 sys.path.append("../")
 
-from kernel import InverseMultiquadricKernel
-from gpis import GaussianProcessImplicitSurfaces
-from lib.judge_where import judge_ellipse
+from kernel import InverseMultiquadricKernel, InverseMultiquadricKernelPytouch
+from gpis import MultiTaskGaussianProcessImplicitSurfaces
+from lib.judge_where import judge_ellipse, judge_object1
 
 import numpy as np
+import torch
+from scipy.stats import norm, multivariate_normal
+
 import matplotlib.pyplot as plt
 
 from matplotlib.colors import BoundaryNorm
@@ -17,15 +20,29 @@ from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 
 from sklearn.metrics import mean_squared_error
-# import time
-
+import time
+import copy
 
 # hyper parameter
 alpha = 0.03
-kernel_param = 0.4
+kernel_param = 0.2
 
+# save data
+error_list, var_ave_list = [], []
 
-def get_object_position(x,y,z, mean, var, r):
+def func(x, y):
+    m=2
+    mean = np.zeros(m)
+    sigma = np.eye(m) * 30
+    X = np.c_[np.ravel(x), np.ravel(y)] * 30
+
+    Y_plot = 100 * (multivariate_normal.pdf(x=X, mean=mean, cov=sigma) - 0.35*multivariate_normal.pdf(x=X, mean=mean, cov=sigma*0.5))-0.045
+
+    # Y_plot = Y_plot.reshape(x.shape)
+
+    return Y_plot
+
+def get_object_position(x,y,z, mean, var):
     mean  = mean.reshape(x.shape)
     var   = var.reshape(x.shape)
     mean0 = np.argmin(np.abs(mean), axis = 2)
@@ -37,15 +54,42 @@ def get_object_position(x,y,z, mean, var, r):
             mean0_y.append(y[i][j][mean0[i][j]])
             mean0_z.append(z[i][j][mean0[i][j]])
             var0.append(var[i][j][mean0[i][j]])
-            tmp = np.sqrt(np.linalg.norm(r**2 - x[i][j][mean0[i][j]]**2 / 4 - y[i][j][mean0[i][j]]**2 / 4))
+            tmp = func(x[i][j][mean0[i][j]], y[i][j][mean0[i][j]])
             z_t.append(tmp)
 
     N = len(x)
     mean0_x = np.array(mean0_x).reshape((N, N))
     mean0_y = np.array(mean0_y).reshape((N, N))
     mean0_z = np.array(mean0_z).reshape((N, N))
-    var0    = np.array(var0).reshape((N, N))
-    z_t     = np.array(z_t).reshape((N, N))
+    var0   = np.array(var0).reshape((N, N))
+    z_t   = np.array(z_t).reshape((N, N))
+
+    error   = np.sqrt(mean_squared_error(mean0_z, z_t))
+    var_ave = np.mean(var0)
+
+    return [mean0_x, mean0_y, mean0_z], var0, error, var_ave
+
+def get_object1_position(x,y,z, mean, var):
+    mean  = mean.reshape(x.shape)
+    var   = var.reshape(x.shape)
+    mean0 = np.argmin(np.abs(mean), axis = 2)
+
+    mean0_x, mean0_y, mean0_z, var0, z_t = [], [], [], [], []
+    for i in range(len(x)):
+        for j in range(len(x)):
+            mean0_x.append(x[i][j][mean0[i][j]])
+            mean0_y.append(y[i][j][mean0[i][j]])
+            mean0_z.append(z[i][j][mean0[i][j]])
+            var0.append(var[i][j][mean0[i][j]])
+            tmp = func(x[i][j][mean0[i][j]],  y[i][j][mean0[i][j]])
+            z_t.append(tmp)
+
+    N = len(x)
+    mean0_x = np.array(mean0_x).reshape((N, N))
+    mean0_y = np.array(mean0_y).reshape((N, N))
+    mean0_z = np.array(mean0_z).reshape((N, N))
+    var0   = np.array(var0).reshape((N, N))
+    z_t   = np.array(z_t).reshape((N, N))
 
     error   = np.sqrt(mean_squared_error(mean0_z, z_t))
     var_ave = np.mean(var0)
@@ -53,10 +97,12 @@ def get_object_position(x,y,z, mean, var, r):
     return [mean0_x, mean0_y, mean0_z], var0, error, var_ave
 
 def plot_estimated_surface(position, var):
-    N = var
-
+    # N = var
+    N = position[2]*8
+    # print N.min()
+    # print N.max()
     ax.plot_surface(position[0], position[1], position[2],facecolors=cm.rainbow(N),
-    linewidth=0, rstride=1, cstride=1, antialiased=False, shade=False)
+    linewidth=0, rstride=1, cstride=1, antialiased=False, shade=False, vmin=N.min(), vmax=N.max())
 
     m = cm.ScalarMappable(cmap=cm.rainbow)
     m.set_array(N)
@@ -77,7 +123,7 @@ def plot_environment(in_surf, out_surf):
     ax.view_init(30, 60)
     ax.set_xlim(-0.4, 0.4)
     ax.set_ylim(-0.4, 0.4)
-    ax.set_zlim(-0.1, 0.3)
+    ax.set_zlim(0, 0.3)
 
     ax.plot_surface(in_surf[0], in_surf[1], in_surf[2], color="green",
     rstride=1, cstride=1, linewidth=0, antialiased=False, shade=False, alpha=0.1)
@@ -85,10 +131,23 @@ def plot_environment(in_surf, out_surf):
     rstride=1, cstride=1, linewidth=0, antialiased=False, shade=False, alpha=0.1)
 
 def make_test_data():
+    # N = 40
+
+    # x = np.linspace(-0.5, 0.5, N)
+    # y = np.linspace(-0.5, 0.5, N)
+    # z = np.linspace(0, 3, N)
+    # X, Y, Z = np.meshgrid(x, y, z)
+
+    # x_test = np.ravel(X)[:,None]
+    # y_test = np.ravel(Y)[:,None]
+    # z_test = np.ravel(Z)[:,None]
+
+    # return X, Y, Z, np.concatenate([x_test, y_test, z_test], 1)
+
     N = 40
     theta = np.linspace(-np.pi, np.pi, N)
     phi   = np.linspace(0, np.pi/2, N)
-    r     = np.linspace(0.01, 0.6, N)
+    r     = np.linspace(0.01, 0.5, N)
 
     THETA, PHI, R = np.meshgrid(theta, phi, r)
 
@@ -103,39 +162,50 @@ def make_test_data():
     return X, Y, Z, np.concatenate([x_test, y_test, z_test], 1)
 
 
+
 if __name__=="__main__":
 
     # object position
-    inside_surface  = np.load("../data/ellipse/ellipse_po_20_2d.npy")
-    outside_surface = np.load("../data/ellipse/ellipse_po_25_2d.npy")
+    inside_surface  = np.load("../data/object/object1_2d.npy")
+    outside_surface = np.load("../data/ellipse/ellipse_po_30_2d.npy")
     radius = 0.2
 
     # Task 1
-    X1 = np.load("../data/ellipse/ellipse_po_25.npy")
+    X1 = np.load("../data/ellipse/ellipse_po_30.npy")
     Y1 = np.zeros(len(X1))[:, None]
     T1 = 0
+    # print X1.shape
+    # tmp = copy.copy(X1)
+    # tmp[:,2] += 0.1
+    # print X1
+    # print tmp
+    # X1 = np.append(X1, tmp, axis=0)
+    # Y1 = np.append(Y1, np.ones(len(Y1))[:, None], axis=0)
+
 
     # Task 2
-    X2 = np.array([[-0.04, 0.04, 0.3],[0.03, -0.01, 0.3]])
-    Y2 = np.array([[1], [1]])
+    X2 = np.array([[-0.04, 0.04, 0.3],[-0.04, -0.04, 0.3], [0.04, -0.04, 0.3], [0.04, 0.04, 0.3]])
+    Y2 = np.array([[1], [1], [1], [1]])
     T2 = 1
+
 
     # test data
     X, Y, Z, XX = make_test_data()
+    XX = torch.from_numpy(XX).float()
 
-    # GPIS model
-    kernel   = InverseMultiquadricKernel([kernel_param])
+    # choose kernel
+    kernel = InverseMultiquadricKernelPytouch([kernel_param])
 
     # Show environment
     fig = plt.figure(figsize=(40, 40), dpi=50)
 
     # Go straight toward the object
-    current_po    = np.array([0.01, 0.01, 0.25])
+    current_po    = np.array([-0.2, -0.1, 0.2])
     position_list = np.array([current_po])
 
 
     while True:
-        if judge_ellipse([current_po[0], current_po[1], current_po[2]-0.002], radius) == -1:
+        if judge_object1([current_po[0], current_po[1], current_po[2]-0.002]) == -1:
             break
 
         current_po[2] -= 0.002
@@ -143,35 +213,63 @@ if __name__=="__main__":
 
         ########################################## Plot ###################################################################
         ax = fig.add_subplot(111, projection='3d')
-
+        # ax.scatter3D(X1[:,0], X1[:,1], X1[:,2])
         plot_environment(inside_surface, outside_surface)
         plot_path(position_list)
+        # plt.show()
         plt.pause(0.001)
         plt.clf()
         ########################################## Plot ###################################################################
-
 
     current_po = current_po[:,None].T
     X2         = np.append(X2, current_po, axis=0)
     Y2         = np.append(Y2, [0])[:,None]
 
 
-    error_list, var_ave_list = [], []
-    for i in range(201):
+    for i in range(501):
             print "========================================================================="
             print "STEP: {}".format(i)
 
-            gp_model           = GaussianProcessImplicitSurfaces(X2, Y2, kernel, c=10)
-            normal, direrction = gp_model.predict_direction(current_po)
+            # if i == 0:
+            # tmp = torch.Tensor([[10e-4, 10e-4], [10e-4, 10e-4]])
+            task_kernel_params = torch.Tensor([[10e-4, 10e-4], [10e-4, 10e-4]])
+            # else:
+                # task_kernel_params = gp_model.task_kernel_params
+                # kernel.params = gp_model.kernel.params
+            print "-----------------------------------------------"
+            # print task_kernel_params
+            # print kernel.params
+
+            X1_t = torch.from_numpy(X1).float()
+            X2_t = torch.from_numpy(X2).float()
+            Y1_t = torch.from_numpy(Y1).float()
+            Y2_t = torch.from_numpy(Y2).float()
+
+            gp_model = MultiTaskGaussianProcessImplicitSurfaces([X1_t, X2_t], [Y1_t, Y2_t], [T1,T2],
+                                                    kernel, task_kernel_params, c=5, z_limit=0.04)
+            # task_kernel_params = gp_model.task_kernel_params
+
+
+            # t1 = time.time()
+
+            # gp_model.learn_params()
+            gp_model.learning()
+            # t2 = time.time()
+            # print "経過時間：", t2-t1
+
+            normal, direrction = gp_model.predict_direction(torch.Tensor(current_po), T2)
+            normal, direrction = normal.numpy(), direrction.numpy()
+            print "normal:", normal
             current_po        += alpha * direrction.T
             position_list      = np.append(position_list, [current_po[0]], axis = 0)
 
-            mean, var = gp_model.predict(XX)
+            mean, var = gp_model.predict(XX, T2)
 
-            estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
-
+            estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var)
             error_list.append(error)
             var_ave_list.append(var_ave)
+            print "error:", error
+            print "var:", var_ave
 
             ########################################## Plot ###################################################################
             ax = fig.add_subplot(111, projection='3d')
@@ -184,7 +282,8 @@ if __name__=="__main__":
             plt.clf()
             ########################################## Plot ###################################################################
 
-            judge = judge_ellipse(current_po[0], radius)
+            # judge = judge_ellipse(current_po[0], radius)
+            judge = judge_object1(current_po[0])
 
             if judge == 0:
                 X2 = np.append(X2, current_po, axis=0)
@@ -195,7 +294,7 @@ if __name__=="__main__":
                 # X2 = np.append(X2, current_po, axis=0)
                 # Y2 = np.append(Y2, [1])[:,None]
                 while True:
-                    if judge_ellipse((current_po - 0.0001 * normal.T)[0], radius) == -1:
+                    if judge_object1((current_po - 0.0001 * normal.T)[0]) == -1:
                         X2 = np.append(X2, current_po, axis=0)
                         Y2 = np.append(Y2, [0])[:,None]
                         break
@@ -203,23 +302,24 @@ if __name__=="__main__":
 
             elif judge == -1:
                 while True:
-                    if judge_ellipse(current_po[0], radius) == 1:
+                    if judge_object1(current_po[0]) == 1:
                         X2 = np.append(X2, current_po, axis=0)
                         Y2 = np.append(Y2, [0])[:,None]
                         break
                     current_po += 0.0001 * normal.T
 
-
-    mean, var = gp_model.predict(XX)
-    estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
-
+    mean, var = gp_model.predict(XX, T2)
+    estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var)
     error_list.append(error)
     var_ave_list.append(var_ave)
     position_list = np.append(position_list, [current_po[0]], axis = 0)
 
-    # np.save("../data/gpis_200_per5/gpis_position", position_list)
-    # np.save("../data/gpis_error_200", error_list)
-    # np.save("../data/gpis_var_ave_200", var_ave_list)
+    print "error:", error_list
+    print "var:", var_ave_list
+
+    # np.save("../data/mtgpis_200_per5/mtgpis_position", position_list)
+    # np.save("../data/mtgpis_error_200_50", error_list)
+    # np.save("../data/mtgpis_var_ave_200_50", var_ave_list)
 
     ########################################## Plot ###################################################################
     ax = fig.add_subplot(111, projection='3d')
@@ -231,9 +331,7 @@ if __name__=="__main__":
     ########################################## Plot ###################################################################
 
 
-
-    # if i % 50 == 0 and i > 0:
-    #     mean, var = gp_model.predict(XX)
-    #     mean_x, mean_y, mean_z, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
-    #     np.save("../data/gpis_200_per5/gpis_{}".format(i), [mean_x, mean_y, mean_z, var, error, var_ave])
-
+            # if i % 50 == 0:
+            #     mean, var = gp_model.predict(XX, T2)
+            #     mean_x, mean_y, mean_z, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
+            #     np.save("../data/mtgpis_200_per5/mtgpis_task1_{}".format(i), [mean_x, mean_y, mean_z, var, error, var_ave])

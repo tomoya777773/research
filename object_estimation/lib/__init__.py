@@ -1,1 +1,1 @@
-from .judge_where import judge_ellipse
+from .judge_where import judge_ellipse, judge_object1

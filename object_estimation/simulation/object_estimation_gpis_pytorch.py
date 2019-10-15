@@ -4,11 +4,13 @@
 import sys
 sys.path.append("../")
 
-from kernel import InverseMultiquadricKernel
+from kernel import InverseMultiquadricKernel, InverseMultiquadricKernelPytouch
 from gpis import GaussianProcessImplicitSurfaces
 from lib.judge_where import judge_ellipse
 
 import numpy as np
+import torch
+
 import matplotlib.pyplot as plt
 
 from matplotlib.colors import BoundaryNorm
@@ -116,15 +118,16 @@ if __name__=="__main__":
     T1 = 0
 
     # Task 2
-    X2 = np.array([[-0.04, 0.04, 0.3],[0.03, -0.01, 0.3]])
-    Y2 = np.array([[1], [1]])
+    X2 = np.array([[-0.04, 0.04, 0.3],[-0.04, -0.04, 0.3], [0.04, -0.04, 0.3], [0.04, 0.04, 0.3]])
+    Y2 = np.array([[1], [1], [1], [1]])
     T2 = 1
 
     # test data
     X, Y, Z, XX = make_test_data()
+    XX = torch.from_numpy(XX).float()
 
     # GPIS model
-    kernel   = InverseMultiquadricKernel([kernel_param])
+    kernel   = InverseMultiquadricKernelPytouch([kernel_param])
 
     # Show environment
     fig = plt.figure(figsize=(40, 40), dpi=50)
@@ -161,15 +164,24 @@ if __name__=="__main__":
             print "========================================================================="
             print "STEP: {}".format(i)
 
-            gp_model           = GaussianProcessImplicitSurfaces(X2, Y2, kernel, c=10)
-            normal, direrction = gp_model.predict_direction(current_po)
+            X2_t = torch.from_numpy(X2).float()
+            Y2_t = torch.from_numpy(Y2).float()
+
+            gp_model = GaussianProcessImplicitSurfaces(X2_t, Y2_t, kernel, c=20)
+
+            # gp_model.learning()
+
+
+            normal, direrction = gp_model.predict_direction(torch.Tensor(current_po))
+            normal, direrction = normal.numpy(), direrction.numpy()
+
             current_po        += alpha * direrction.T
             position_list      = np.append(position_list, [current_po[0]], axis = 0)
 
             mean, var = gp_model.predict(XX)
 
             estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
-
+            print "error:", error
             error_list.append(error)
             var_ave_list.append(var_ave)
 
