@@ -78,13 +78,12 @@ class MultiTaskGaussianProcessImplicitSurfaces:
 
         return  torch.logdet(K) + self.Y_m.T.mm(invKY)
 
-    def learning(self):
-        max_iter = 200
+    def learning(self, max_iter=40):
 
         self.compute_grad(True)
         params = [self.learning_params]
         # params = [self.task_kernel_params] + [self.kernel.params] + [self.sigma_y]
-        optimizer = torch.optim.Adam(params, lr=0.1)
+        optimizer = torch.optim.Adam(params, lr=0.05)
         # optimizer = torch.optim.LBFGS(params, history_size=20, max_iter=100)
         # optimizer = torch.optim.SGD(params, lr=1e-3)
 

@@ -23,7 +23,10 @@ import copy
 
 # hyper parameter
 alpha = 0.03
-kernel_param = 0.5
+kernel_param = 0.3
+sigma = 0.1
+z_limit = 0.05
+c = 10
 
 # save data
 error_list, var_ave_list = [], []
@@ -52,9 +55,8 @@ def get_object_position(x,y,z, mean, var, r):
     z_t   = np.array(z_t).reshape((N, N))
 
     error   = np.sqrt(mean_squared_error(mean0_z, z_t))
-    var_ave = np.mean(var0)
 
-    return [mean0_x, mean0_y, mean0_z], var0, error, var_ave
+    return [mean0_x, mean0_y, mean0_z], var0, error
 
 def plot_estimated_surface(position, var):
     N = var
@@ -80,9 +82,9 @@ def plot_environment(in_surf, out_surf):
     ax._axis3don = False
 
     ax.view_init(30, 60)
-    ax.set_xlim(-0.4, 0.4)
-    ax.set_ylim(-0.4, 0.4)
-    ax.set_zlim(-0.1, 0.3)
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_ylim(-1.2, 1.2)
+    ax.set_zlim(-1.2, 1.2)
 
     ax.plot_surface(in_surf[0], in_surf[1], in_surf[2], color="green",
     rstride=1, cstride=1, linewidth=0, antialiased=False, shade=False, alpha=0.1)
@@ -90,7 +92,7 @@ def plot_environment(in_surf, out_surf):
     rstride=1, cstride=1, linewidth=0, antialiased=False, shade=False, alpha=0.1)
 
 def make_test_data():
-    N = 30
+    N = 40
     theta = np.linspace(-np.pi, np.pi, N)
     phi   = np.linspace(0, np.pi/2, N)
     r     = np.linspace(0.1, 0.6, N)
@@ -112,27 +114,28 @@ if __name__=="__main__":
 
     # object position
     inside_surface  = np.load("../data/ellipse/ellipse_po_20_2d.npy")
-    outside_surface = np.load("../data/ellipse/ellipse_po_30_2d.npy")
+    outside_surface = np.load("../data/ellipse/ellipse_po_100_2d.npy")
     radius = 0.2
 
     # Task 1
-    X1 = np.load("../data/ellipse/ellipse_po_30.npy")
+    X1 = np.load("../data/ellipse/ellipse_po_100.npy")
     Y1 = np.zeros(len(X1))[:, None]
     T1 = 0
     # print X1.shape
     # tmp = copy.copy(X1)
     # tmp[:,2] += 0.1
-    # print X1
-    # print tmp
+    # # print X1
+    # # print tmp
     # X1 = np.append(X1, tmp, axis=0)
     # Y1 = np.append(Y1, np.ones(len(Y1))[:, None], axis=0)
 
 
     # Task 2
-    X2 = np.array([[-0.04, 0.04, 0.3],[-0.04, -0.04, 0.3], [0.04, -0.04, 0.3], [0.04, 0.04, 0.3]])
+    X2 = np.array([[-0.04, 0.04, 0.25],[-0.04, -0.04, 0.25], [0.04, -0.04, 0.25], [0.04, 0.04, 0.25]])
     Y2 = np.array([[1], [1], [1], [1]])
     T2 = 1
-
+    # X1 = np.append(X1, X2, axis=0)
+    # Y1 = np.append(Y1, np.ones(len(X2))[:, None], axis=0)
 
     # test data
     X, Y, Z, XX = make_test_data()
@@ -145,7 +148,7 @@ if __name__=="__main__":
     fig = plt.figure(figsize=(40, 40), dpi=50)
 
     # Go straight toward the object
-    current_po    = np.array([-0.01, -0.01, 0.22])
+    current_po    = np.array([-0.03, 0, 0.25])
     position_list = np.array([current_po])
 
 
@@ -162,6 +165,7 @@ if __name__=="__main__":
         plot_environment(inside_surface, outside_surface)
         plot_path(position_list)
         # plt.show()
+        plt.draw()
         plt.pause(0.001)
         plt.clf()
         ########################################## Plot ###################################################################
@@ -171,19 +175,16 @@ if __name__=="__main__":
     Y2         = np.append(Y2, [0])[:,None]
 
 
-    for i in range(201):
+    for i in range(200):
             print "========================================================================="
             print "STEP: {}".format(i)
 
-            # if i == 0:
-            # tmp = torch.Tensor([[10e-4, 10e-4], [10e-4, 10e-4]])
-            task_kernel_params = torch.Tensor([[10e-4, 10e-4], [10e-4, 10e-4]])
-            # else:
-                # task_kernel_params = gp_model.task_kernel_params
-                # kernel.params = gp_model.kernel.params
-            print "-----------------------------------------------"
-            # print task_kernel_params
-            # print kernel.params
+            if i == 0:
+                task_kernel_params = torch.Tensor([[1, 10e-4], [10e-4, 1]])
+                max_iter = 300
+            else:
+                task_kernel_params = gp_model.task_kernel_params
+                max_iter = 40
 
             X1_t = torch.from_numpy(X1).float()
             X2_t = torch.from_numpy(X2).float()
@@ -191,16 +192,9 @@ if __name__=="__main__":
             Y2_t = torch.from_numpy(Y2).float()
 
             gp_model = MultiTaskGaussianProcessImplicitSurfaces([X1_t, X2_t], [Y1_t, Y2_t], [T1,T2],
-                                                    kernel, task_kernel_params, c=5, z_limit=0.04)
-            # task_kernel_params = gp_model.task_kernel_params
+                                                    kernel, task_kernel_params, c=c, sigma=sigma, z_limit=z_limit)
 
-
-            # t1 = time.time()
-
-            # gp_model.learn_params()
-            gp_model.learning()
-            # t2 = time.time()
-            # print "経過時間：", t2-t1
+            gp_model.learning(max_iter=max_iter)
 
             normal, direrction = gp_model.predict_direction(torch.Tensor(current_po), T2)
             normal, direrction = normal.numpy(), direrction.numpy()
@@ -210,19 +204,19 @@ if __name__=="__main__":
 
             mean, var = gp_model.predict(XX, T2)
 
-            estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
+            estimated_surface, var, error = get_object_position(X, Y, Z, mean, var, radius)
             error_list.append(error)
-            var_ave_list.append(var_ave)
+            var_ave_list.append(np.mean(var))
             print "error:", error
-            print "var:", var_ave
+            print "var:", np.mean(var)
+            np.save("../data/mtgpis/ellipse100/step_{}".format(i), [np.array(mean), np.array(var), np.array(gp_model.task_kernel)])
 
             ########################################## Plot ###################################################################
             ax = fig.add_subplot(111, projection='3d')
-
             plot_environment(inside_surface, outside_surface)
             plot_estimated_surface(estimated_surface, var)
             plot_path(position_list)
-
+            plt.draw()
             plt.pause(0.001)
             plt.clf()
             ########################################## Plot ###################################################################
@@ -253,17 +247,17 @@ if __name__=="__main__":
                     current_po += 0.0001 * normal.T
 
     mean, var = gp_model.predict(XX, T2)
-    estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
+    estimated_surface, var, error = get_object_position(X, Y, Z, mean, var, radius)
     error_list.append(error)
-    var_ave_list.append(var_ave)
+    var_ave_list.append(np.mean(var))
     position_list = np.append(position_list, [current_po[0]], axis = 0)
 
     print "error:", error_list
     print "var:", var_ave_list
+    np.save("../data/mtgpis/ellipse100/position", position_list)
+    np.save("../data/mtgpis/ellipse100/error", error_list)
+    np.save("../data/mtgpis/ellipse100/var", var_ave_list)
 
-    # np.save("../data/mtgpis_200_per5/mtgpis_position", position_list)
-    # np.save("../data/mtgpis_error_200_50", error_list)
-    # np.save("../data/mtgpis_var_ave_200_50", var_ave_list)
 
     ########################################## Plot ###################################################################
     ax = fig.add_subplot(111, projection='3d')

@@ -50,9 +50,8 @@ def get_object_position(x,y,z, mean, var, r):
     z_t     = np.array(z_t).reshape((N, N))
 
     error   = np.sqrt(mean_squared_error(mean0_z, z_t))
-    var_ave = np.mean(var0)
 
-    return [mean0_x, mean0_y, mean0_z], var0, error, var_ave
+    return [mean0_x, mean0_y, mean0_z], var0, error
 
 def plot_estimated_surface(position, var):
     N = var
@@ -160,7 +159,7 @@ if __name__=="__main__":
 
 
     error_list, var_ave_list = [], []
-    for i in range(201):
+    for i in range(200):
             print "========================================================================="
             print "STEP: {}".format(i)
 
@@ -180,10 +179,12 @@ if __name__=="__main__":
 
             mean, var = gp_model.predict(XX)
 
-            estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
-            print "error:", error
+            estimated_surface, var, error = get_object_position(X, Y, Z, mean, var, radius)
             error_list.append(error)
-            var_ave_list.append(var_ave)
+            var_ave_list.append(np.mean(var))
+            print "error:", error
+            print "var:", np.mean(var)
+            np.save("../data/gpis/step_{}".format(i), [np.array(mean), np.array(var)])
 
             ########################################## Plot ###################################################################
             ax = fig.add_subplot(111, projection='3d')
@@ -223,15 +224,15 @@ if __name__=="__main__":
 
 
     mean, var = gp_model.predict(XX)
-    estimated_surface, var, error, var_ave = get_object_position(X, Y, Z, mean, var, radius)
+    estimated_surface, var, error = get_object_position(X, Y, Z, mean, var, radius)
 
     error_list.append(error)
-    var_ave_list.append(var_ave)
+    var_ave_list.append(np.mean(var))
     position_list = np.append(position_list, [current_po[0]], axis = 0)
 
-    # np.save("../data/gpis_200_per5/gpis_position", position_list)
-    # np.save("../data/gpis_error_200", error_list)
-    # np.save("../data/gpis_var_ave_200", var_ave_list)
+    np.save("../data/gpis/gpis_position", position_list)
+    np.save("../data/gpis/gpis_error", error_list)
+    np.save("../data/gpis/gpis_var_ave", var_ave_list)
 
     ########################################## Plot ###################################################################
     ax = fig.add_subplot(111, projection='3d')
