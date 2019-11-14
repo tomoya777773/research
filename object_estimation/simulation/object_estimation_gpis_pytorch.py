@@ -24,8 +24,8 @@ from sklearn.metrics import mean_squared_error
 
 # hyper parameter
 alpha = 0.03
-kernel_param = 0.4
-
+kernel_param = 0.3
+sigma = 0.1
 
 def get_object_position(x,y,z, mean, var, r):
     mean  = mean.reshape(x.shape)
@@ -89,7 +89,7 @@ def make_test_data():
     N = 40
     theta = np.linspace(-np.pi, np.pi, N)
     phi   = np.linspace(0, np.pi/2, N)
-    r     = np.linspace(0.01, 0.6, N)
+    r     = np.linspace(0.1, 0.6, N)
 
     THETA, PHI, R = np.meshgrid(theta, phi, r)
 
@@ -117,7 +117,7 @@ if __name__=="__main__":
     T1 = 0
 
     # Task 2
-    X2 = np.array([[-0.04, 0.04, 0.3],[-0.04, -0.04, 0.3], [0.04, -0.04, 0.3], [0.04, 0.04, 0.3]])
+    X2 = np.array([[-0.04, 0.04, 0.25],[-0.04, -0.04, 0.25], [0.04, -0.04, 0.25], [0.04, 0.04, 0.25]])
     Y2 = np.array([[1], [1], [1], [1]])
     T2 = 1
 
@@ -166,7 +166,7 @@ if __name__=="__main__":
             X2_t = torch.from_numpy(X2).float()
             Y2_t = torch.from_numpy(Y2).float()
 
-            gp_model = GaussianProcessImplicitSurfaces(X2_t, Y2_t, kernel, c=20)
+            gp_model = GaussianProcessImplicitSurfaces(X2_t, Y2_t, kernel, sigma=sigma, c=100)
 
             # gp_model.learning()
 
@@ -187,14 +187,14 @@ if __name__=="__main__":
             np.save("../data/gpis/step_{}".format(i), [np.array(mean), np.array(var)])
 
             ########################################## Plot ###################################################################
-            ax = fig.add_subplot(111, projection='3d')
+            # ax = fig.add_subplot(111, projection='3d')
 
-            plot_environment(inside_surface, outside_surface)
-            plot_estimated_surface(estimated_surface, var)
-            plot_path(position_list)
+            # plot_environment(inside_surface, outside_surface)
+            # plot_estimated_surface(estimated_surface, var)
+            # plot_path(position_list)
 
-            plt.pause(0.001)
-            plt.clf()
+            # plt.pause(0.001)
+            # plt.clf()
             ########################################## Plot ###################################################################
 
             judge = judge_ellipse(current_po[0], radius)
