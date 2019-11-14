@@ -50,7 +50,7 @@ c = np.load("../data/mtgpis/ellipse25/error.npy")
 d = np.load("../data/mtgpis/ellipse30/error.npy")
 e = np.load("../data/mtgpis/ellipse80/error.npy")
 f = np.load("../data/mtgpis/ellipse100/error.npy")
-# g = np.load("../data/mtgpis_error_200_cos.npy")
+g = np.load("../data/mtgpis/ellipse1000/error.npy")
 
 x = np.arange(len(b))
 # print a

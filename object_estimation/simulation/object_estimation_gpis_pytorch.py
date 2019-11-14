@@ -24,8 +24,8 @@ from sklearn.metrics import mean_squared_error
 
 # hyper parameter
 alpha = 0.03
-kernel_param = 0.3
-sigma = 0.1
+kernel_param = 0.2
+sigma = 0.3
 
 def get_object_position(x,y,z, mean, var, r):
     mean  = mean.reshape(x.shape)
@@ -89,7 +89,7 @@ def make_test_data():
     N = 40
     theta = np.linspace(-np.pi, np.pi, N)
     phi   = np.linspace(0, np.pi/2, N)
-    r     = np.linspace(0.1, 0.6, N)
+    r     = np.linspace(0, 0.5, N)
 
     THETA, PHI, R = np.meshgrid(theta, phi, r)
 
@@ -132,7 +132,7 @@ if __name__=="__main__":
     fig = plt.figure(figsize=(40, 40), dpi=50)
 
     # Go straight toward the object
-    current_po    = np.array([0.01, 0.01, 0.25])
+    current_po    = np.array([-0.03, 0, 0.25])
     position_list = np.array([current_po])
 
 
@@ -187,14 +187,14 @@ if __name__=="__main__":
             np.save("../data/gpis/step_{}".format(i), [np.array(mean), np.array(var)])
 
             ########################################## Plot ###################################################################
-            # ax = fig.add_subplot(111, projection='3d')
+            ax = fig.add_subplot(111, projection='3d')
 
-            # plot_environment(inside_surface, outside_surface)
-            # plot_estimated_surface(estimated_surface, var)
-            # plot_path(position_list)
+            plot_environment(inside_surface, outside_surface)
+            plot_estimated_surface(estimated_surface, var)
+            plot_path(position_list)
 
-            # plt.pause(0.001)
-            # plt.clf()
+            plt.pause(0.001)
+            plt.clf()
             ########################################## Plot ###################################################################
 
             judge = judge_ellipse(current_po[0], radius)

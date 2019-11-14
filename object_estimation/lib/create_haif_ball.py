@@ -5,7 +5,7 @@ import mpl_toolkits.mplot3d.axes3d as axes3d
 theta, phi = np.linspace(-np.pi, np.pi, 20), np.linspace(0, np.pi/4, 10)
 # theta, phi = np.linspace(np.pi/8, np.pi/8*7, 1), np.linspace(np.pi/8, np.pi/9*4, 1)
 
-r = 1.0
+r = 0.5
 THETA, PHI = np.meshgrid(theta, phi)
 R = np.cos(PHI) * r*2
 XX = R * np.sin(PHI) * np.cos(THETA) * 2
@@ -34,5 +34,5 @@ sphere_po_2d = np.array([XX, YY, ZZ])
 print sphere_po.shape
 print sphere_po_2d.shape
 
-np.save("../data/ellipse/ellipse_po_100", sphere_po)
-np.save("../data/ellipse/ellipse_po_100_2d", sphere_po_2d)
+np.save("../data/ellipse/ellipse_po_50", sphere_po)
+np.save("../data/ellipse/ellipse_po_50_2d", sphere_po_2d)
